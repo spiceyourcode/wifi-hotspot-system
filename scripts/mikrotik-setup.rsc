@@ -35,14 +35,16 @@
 #    Adjust gateway IPs to match your ISPs (usually assigned via DHCP).
 #    For DHCP WAN, use /ip dhcp-client add interface=WAN1 disabled=no
 # ────────────────────────────────────────────────────────────────
-/ip address
-add address=192.168.10.1/24 interface=WAN1 comment="WAN1 Static — adjust per ISP"
-add address=192.168.20.1/24 interface=WAN2 comment="WAN2 Static — adjust per ISP"
-add address=192.168.88.1/24 interface=LAN  comment="LAN Gateway"
+
+#If the ISP is using static IP addresses, comment out the DHCP client lines and uncomment the static IP addresses.
+#/ip address
+#add address=192.168.10.1/24 interface=WAN1 comment="WAN1 Static — adjust per ISP"
+#add address=192.168.20.1/24 interface=WAN2 comment="WAN2 Static — adjust per ISP"
+#add address=192.168.88.1/24 interface=LAN  comment="LAN Gateway"
 
 # If your ISPs use DHCP, comment above and uncomment these:
-# /ip dhcp-client add interface=WAN1 disabled=no add-default-route=no
-# /ip dhcp-client add interface=WAN2 disabled=no add-default-route=no
+/ip dhcp-client add interface=WAN1 disabled=no add-default-route=no
+/ip dhcp-client add interface=WAN2 disabled=no add-default-route=no
 
 # ────────────────────────────────────────────────────────────────
 # 3. DUAL-WAN: PCC LOAD BALANCING + FAILOVER

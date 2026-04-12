@@ -14,8 +14,9 @@ const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 const path = require("path");
 const fs = require("fs");
-
 const logger = require("./services/logger");
+
+const morgan = require("morgan");
 const paymentRoutes = require("./routes/payment");
 const callbackRoutes = require("./routes/callback");
 const adminRoutes = require("./routes/admin");
@@ -61,10 +62,7 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: false, limit: "1mb" }));
 
 // ── Request logger ────────────────────────────────────────────────────────
-app.use((req, _res, next) => {
-  logger.debug(`${req.method} ${req.path} — ${req.ip}`);
-  next();
-});
+app.use(morgan("combined"));
 
 // ── Rate limiters ─────────────────────────────────────────────────────────
 const defaultLimiter = rateLimit({
@@ -89,6 +87,11 @@ app.use(defaultLimiter);
 
 // ── Static captive portal ─────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, "portal")));
+
+// Root → serve captive portal (express.static only matches exact paths)
+app.get("/", (_req, res) => {
+  res.sendFile(path.join(__dirname, "portal", "login.html"));
+});
 
 // ── Routes ────────────────────────────────────────────────────────────────
 app.use("/pay", payLimiter, paymentRoutes);

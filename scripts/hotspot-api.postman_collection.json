@@ -1,0 +1,491 @@
+{
+  "info": {
+    "name": "WiFi Hotspot Monetization API",
+    "description": "Complete test suite for the WiFi Hotspot system.\n\n**Setup:**\n1. Set the `base_url` variable to `http://localhost:3000`\n2. Set `admin_token` to the value of ADMIN_TOKEN in your .env\n3. Run requests in order — 'Pay' returns a `checkoutRequestId`, paste it into the callback/status requests.",
+    "_postman_id": "hotspot-system-v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000", "type": "string" },
+    {
+      "key": "admin_token",
+      "value": "hotspot-admin-secret-2024",
+      "type": "string"
+    },
+    { "key": "checkout_req_id", "value": "", "type": "string" },
+    {
+      "key": "ngrok_url",
+      "value": "https://unhoodwinked-preluxurious-korey.ngrok-free.dev",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1 — Health & Info",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "description": "Basic health check. Should return {status:'ok'}. No auth required."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ok response', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.status).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET / (Captive Portal Page)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/",
+            "description": "Should return the login.html captive portal page."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns HTML', () => {",
+                  "  pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pay/packages",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/pay/packages",
+            "description": "Returns all available internet packages (1hr, 6hr, 24hr, 7day). No auth required. Used by the captive portal UI."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has packages array', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.success).to.be.true;",
+                  "  pm.expect(j.packages).to.be.an('array').with.length.above(0);",
+                  "});",
+                  "pm.test('Each package has required fields', () => {",
+                  "  pm.response.json().packages.forEach(p => {",
+                  "    pm.expect(p).to.have.all.keys('key','name','amount','speed','description');",
+                  "  });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 — Payments (M-Pesa)",
+      "item": [
+        {
+          "name": "POST /pay/pay — Initiate STK Push",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/pay/pay",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0792873281\",\n  \"package\": \"1hr\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Fires an STK Push to the given phone number. Sandbox mode — use real Safaricom numbers for the prompt to show up. Returns checkoutRequestId — save it for the callback/status tests."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('STK Push success', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.success).to.be.true;",
+                  "  pm.expect(j.checkoutRequestId).to.be.a('string');",
+                  "  // Save for later requests",
+                  "  pm.collectionVariables.set('checkout_req_id', j.checkoutRequestId);",
+                  "  console.log('Saved checkoutRequestId:', j.checkoutRequestId);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pay/pay — Bad phone (should fail)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/pay/pay",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"12345\",\n  \"package\": \"1hr\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Should return 400 — invalid phone number."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Error message present', () => {",
+                  "  pm.expect(pm.response.json().success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pay/pay — Bad package (should fail)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/pay/pay",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"0712345678\",\n  \"package\": \"fakepkg\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Should return 400 — unknown package key."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Lists valid packages', () => {",
+                  "  const msg = pm.response.json().message;",
+                  "  pm.expect(msg).to.include('Available:');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pay/status/:id — Poll payment",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/pay/status/{{checkout_req_id}}",
+            "description": "Poll the status of a payment by its CheckoutRequestID. Run AFTER the STK Push request — the checkoutRequestId variable is auto-saved by the test script above."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has payment status', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.success).to.be.true;",
+                  "  pm.expect(['pending','completed','failed']).to.include(j.status);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 — Callbacks (M-Pesa Simulation)",
+      "item": [
+        {
+          "name": "POST /callback/mpesa — Success",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/callback/mpesa",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Body\": {\n    \"stkCallback\": {\n      \"MerchantRequestID\": \"test-merchant-id\",\n      \"CheckoutRequestID\": \"{{checkout_req_id}}\",\n      \"ResultCode\": 0,\n      \"ResultDesc\": \"The service request is processed successfully.\",\n      \"CallbackMetadata\": {\n        \"Item\": [\n          { \"Name\": \"Amount\",             \"Value\": 10 },\n          { \"Name\": \"MpesaReceiptNumber\", \"Value\": \"QJK999TEST\" },\n          { \"Name\": \"TransactionDate\",    \"Value\": 20241201143000 },\n          { \"Name\": \"PhoneNumber\",        \"Value\": 254792873281 }\n        ]\n      }\n    }\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Simulates a successful Safaricom callback. Uses the checkout_req_id saved from the STK Push request. Should trigger MikroTik provisioning."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Accepted', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.ResultCode).to.eql(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /callback/mpesa — User Cancelled",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/callback/mpesa",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Body\": {\n    \"stkCallback\": {\n      \"MerchantRequestID\": \"test-merchant-id\",\n      \"CheckoutRequestID\": \"{{checkout_req_id}}\",\n      \"ResultCode\": 1032,\n      \"ResultDesc\": \"Request cancelled by user\"\n    }\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Simulates a cancelled/failed M-Pesa payment. Sets payment status to 'failed'."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Accepted', () => pm.expect(pm.response.json().ResultCode).to.eql(0));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 — Admin (requires Bearer token)",
+      "item": [
+        {
+          "name": "GET /admin/payments — Payment history",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/admin/payments?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "payments"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "description": "Returns paginated payment history. Requires Bearer token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has payments array', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.success).to.be.true;",
+                  "  pm.expect(j.payments).to.be.an('array');",
+                  "  pm.expect(j).to.have.property('total');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/failures — Provisioning failures",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/failures",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "description": "Lists payments that succeeded (M-Pesa confirmed) but MikroTik provisioning failed. Requires Bearer token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has failures array', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.success).to.be.true;",
+                  "  pm.expect(j.failures).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/provision — Manual provision",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/admin/provision",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"254792873281\",\n  \"package\": \"1hr\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Manually provision a user on MikroTik (retries failed provisioning). Will fail if MikroTik router is not reachable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Response received', () => {",
+                  "  pm.expect([200, 500]).to.include(pm.response.code);",
+                  "  console.log('Provision result:', pm.response.json());",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/user/:phone/status — MikroTik session",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/user/254792873281/status",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "description": "Checks if this phone number has an active MikroTik hotspot session. Will fail if router not connected."
+          }
+        },
+        {
+          "name": "DELETE /admin/user/:phone — Remove user",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/admin/user/254792873281",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "description": "Removes a hotspot user from MikroTik (e.g. refund / expiry). Will fail if router not connected."
+          }
+        },
+        {
+          "name": "GET /admin/payments — No token (should 401)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/admin/payments",
+            "description": "Should return 401 Unauthorized when no Bearer token is sent."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Unauthorized message', () => {",
+                  "  pm.expect(pm.response.json().message).to.eql('Unauthorized');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /admin/failures/:id/resolve",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/admin/failures/1/resolve",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "description": "Mark a provisioning failure as resolved. Change '1' in the URL to a real failure ID from GET /admin/failures."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 — Edge Cases",
+      "item": [
+        {
+          "name": "GET /nonexistent — 404",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/status",
+            "description": "Should return 404 — this endpoint doesn't exist."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error message', () => {",
+                  "  pm.expect(pm.response.json().message).to.eql('Endpoint not found');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pay/pay — Missing body (400)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/pay/pay",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Should return 400 — phone and package are required."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Validation error', () => {",
+                  "  pm.expect(pm.response.json().success).to.be.false;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -105,12 +105,14 @@ router.get("/payments", async (req, res) => {
   const limit = Math.min(100, parseInt(req.query.limit || "20", 10));
   const offset = (page - 1) * limit;
 
+  // NOTE: LIMIT/OFFSET must be interpolated — mysql2 prepared statements
+  // (execute) reject them as ? placeholders in MySQL 8+. Safe because both
+  // values are sanitised integers (parseInt + Math.min/max above).
   const [rows] = await db.execute(
     `SELECT id, phone, amount, package_key, mpesa_code, status, created_at
      FROM payments
      ORDER BY created_at DESC
-     LIMIT ? OFFSET ?`,
-    [limit, offset],
+     LIMIT ${limit} OFFSET ${offset}`,
   );
   const [[{ total }]] = await db.execute(
     `SELECT COUNT(*) AS total FROM payments`,
