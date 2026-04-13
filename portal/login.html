@@ -283,6 +283,9 @@
     <!-- Body -->
     <div class="card-body">
 
+      <!-- Session Resume -->
+      <div id="resumeSection" style="display:none; margin-bottom: 20px;"></div>
+
       <!-- Phone input -->
       <label for="phone">M-Pesa Phone Number</label>
       <input type="tel" id="phone" placeholder="e.g. 0712 345 678" inputmode="numeric" maxlength="15"
@@ -330,6 +333,13 @@
 
     </div>
 
+    <!-- Hidden MikroTik Login Form -->
+    <form id="mikrotikForm" action="http://192.168.88.1/login" method="post" style="display:none">
+      <input type="hidden" name="username" id="hs_user">
+      <input type="hidden" name="password" id="hs_pass">
+      <input type="hidden" name="dst" value="http://192.168.88.1/">
+    </form>
+
     <!-- Footer -->
     <div class="card-footer">
       Powered by <strong>M-Pesa</strong> &nbsp;|&nbsp; Secure &amp; Instant
@@ -341,18 +351,67 @@
     // Replace this with your laptop's actual LAN IP:
     const API_BASE = "http://192.168.88.253:3000";
 
+    /**
+     * Automatically log into MikroTik after provisioning
+     */
+    function loginToMikrotik(username) {
+      if (!username) return;
+      // Save for next time
+      localStorage.setItem('hotspot_phone', username);
+
+      document.getElementById('hs_user').value = username;
+      document.getElementById('hs_pass').value = username;
+      document.getElementById('mikrotikForm').submit();
+    }
+
     // ── State ────────────────────────────────────────────────────────────────
     let selectedPackage = '1hr';
     let pollInterval = null;
 
-    // ── Package selection ────────────────────────────────────────────────────
-    document.querySelectorAll('.pkg-card').forEach(card => {
-      card.addEventListener('click', () => {
-        document.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        selectedPackage = card.dataset.key;
+    // ── Initial Load ─────────────────────────────────────────────────────────
+    window.onload = () => {
+      const savedPhone = localStorage.getItem('hotspot_phone');
+      if (savedPhone) {
+        document.getElementById('phone').value = savedPhone;
+        checkSessionStatus(savedPhone);
+      }
+
+      // Package click listeners
+      document.querySelectorAll('.pkg-card').forEach(card => {
+        card.addEventListener('click', () => {
+          document.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('active'));
+          card.classList.add('active');
+          selectedPackage = card.getAttribute('data-key');
+        });
       });
-    });
+    };
+
+    /**
+     * Check if this phone has an active paid session
+     */
+    async function checkSessionStatus(phone) {
+      try {
+        const res = await fetch(`${API_BASE}/admin/status/${phone}`, {
+          headers: { 'Authorization': 'Bearer hotspot-admin-secret-2024' }
+        });
+        const data = await res.json();
+        if (data.active) {
+          showResumeSection(phone);
+        }
+      } catch (e) { }
+    }
+
+    function showResumeSection(phone) {
+      const section = document.getElementById('resumeSection');
+      section.innerHTML = `
+        <div class="msg info" style="margin-bottom:15px; display:block">
+          Welcome back! You have an active session for <strong>${phone}</strong>
+        </div>
+        <button class="btn-pay" style="background:#555; margin-bottom:10px;" onclick="loginToMikrotik('${phone}')">Continue Browsing</button>
+        <div style="text-align:center; font-size:0.8rem; color:#777; margin-bottom:15px;">— or use a different number below —</div>
+      `;
+      section.style.display = 'block';
+    }
 
     // ── Show status message ──────────────────────────────────────────────────
     function showMsg(type, html) {
@@ -389,8 +448,9 @@
         const data = await res.json();
 
         if (data.success) {
-          showMsg('success', `✅ ${data.message} Redirecting...`);
-          setTimeout(() => { window.location.href = 'http://connectivitycheck.gstatic.com/'; }, 3000);
+          showMsg('success', `✅ ${data.message} Logging you in...`);
+          // Fixed: Use normalized username from server
+          setTimeout(() => { loginToMikrotik(data.username); }, 2000);
         } else {
           showMsg('error', `❌ ${data.message}`);
           btn.disabled = false;
@@ -418,7 +478,7 @@
       btn.textContent = 'Sending prompt…';
 
       try {
-        const res = await fetch(`${API_BASE}/pay/pay`, {
+        const res = await fetch(`${API_BASE}/pay`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone, package: selectedPackage }),
@@ -439,7 +499,7 @@
         <small>KES ${data.amount} for ${data.package}</small>`
         );
         btn.textContent = 'Waiting for payment…';
-        startPolling(data.checkoutRequestId);
+        startPolling(data.checkoutRequestId, phone);
 
       } catch (err) {
         showMsg('error', '❌ Network error. Please check your connection and try again.');
@@ -449,7 +509,7 @@
     }
 
     // ── Poll payment status ──────────────────────────────────────────────────
-    function startPolling(checkoutRequestId) {
+    function startPolling(checkoutRequestId, phone) {
       let attempts = 0;
       const MAX_ATTEMPTS = 30;
 
@@ -468,8 +528,9 @@
 
           if (data.status === 'completed') {
             clearInterval(pollInterval);
-            showMsg('success', '✅ <strong>Payment confirmed!</strong> Redirecting...');
-            setTimeout(() => { window.location.href = 'http://connectivitycheck.gstatic.com/'; }, 3000);
+            showMsg('success', '✅ <strong>Payment confirmed!</strong> Logging you in...');
+            // Fixed: Use normalized username from server
+            setTimeout(() => { loginToMikrotik(data.username); }, 2000);
 
           } else if (data.status === 'failed') {
             clearInterval(pollInterval);

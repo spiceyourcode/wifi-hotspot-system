@@ -40,6 +40,8 @@ const logger = require("../services/logger");
  * }
  */
 router.post("/mpesa", async (req, res) => {
+  logger.info("📢 [M-PESA] CALLBACK RECEIVED! Checking payload...");
+
   // Always respond 200 immediately — Daraja retries if it gets non-2xx
   res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
 

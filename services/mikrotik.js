@@ -2,20 +2,20 @@
 // MikroTik RouterOS API integration using node-routeros
 // Creates/removes/checks hotspot users programmatically
 
-'use strict';
+"use strict";
 
-const RouterOSAPI = require('node-routeros').RouterOSAPI;
-const logger = require('./logger');
+const RouterOSAPI = require("node-routeros").RouterOSAPI;
+const logger = require("./logger");
 
 // Connection config read from env
 const ROUTER_CONFIG = {
-  host:     process.env.MIKROTIK_HOST     || '192.168.88.1',
-  port:     parseInt(process.env.MIKROTIK_PORT || '8728', 10),
-  user:     process.env.MIKROTIK_USER     || 'admin',
-  password: process.env.MIKROTIK_PASSWORD || '',
+  host: process.env.MIKROTIK_HOST || "192.168.88.1",
+  port: parseInt(process.env.MIKROTIK_PORT || "8728", 10),
+  user: process.env.MIKROTIK_USER || "admin",
+  password: process.env.MIKROTIK_PASSWORD || "",
 };
 
-const HOTSPOT_SERVER = process.env.MIKROTIK_HOTSPOT_SERVER || 'hotspot1';
+const HOTSPOT_SERVER = process.env.MIKROTIK_HOTSPOT_SERVER || "hotspot1";
 
 /**
  * Get a connected RouterOS API client.
@@ -34,7 +34,11 @@ async function getClient() {
  * @param {RouterOSAPI} client
  */
 async function closeClient(client) {
-  try { await client.close(); } catch (_) { /* ignore */ }
+  try {
+    await client.close();
+  } catch (_) {
+    /* ignore */
+  }
 }
 
 /**
@@ -48,51 +52,48 @@ async function closeClient(client) {
  * @returns {Promise<{action: 'created'|'updated', username: string}>}
  */
 async function provisionUser(phone, profile, durationSec) {
-  const username = phone;   // phone number as username for easy lookup
-  const password = phone;   // same — user doesn't type it; portal auto-logs in
-  const client   = await getClient();
+  const username = phone; // phone number as username for easy lookup
+  const password = phone; // same — user doesn't type it; portal auto-logs in
+  const client = await getClient();
 
   try {
-    // Check if user already exists
-    const existing = await client.write('/ip/hotspot/user/print', [
+    // ── Pre-Cleanup (Ensure a fresh start for the new package) ──────────────
+    // Remove if exists (to reset cumulative uptime)
+    const existing = await client.write("/ip/hotspot/user/print", [
       `?name=${username}`,
-      `?server=${HOTSPOT_SERVER}`,
     ]);
-
-    if (existing.length > 0) {
-      // Update existing user — extend their session
-      await client.write('/ip/hotspot/user/set', [
-        `=.id=${existing[0]['.id']}`,
-        `=profile=${profile}`,
-        `=uptime-limit=${formatUptime(durationSec)}`,
-        `=comment=Updated ${new Date().toISOString()}`,
-      ]);
-
-      // Kick any active session so re-login picks up the new profile immediately
-      const activeSessions = await client.write('/ip/hotspot/active/print', [
-        `?user=${username}`,
-      ]);
-      for (const session of activeSessions) {
-        await client.write('/ip/hotspot/active/remove', [`=.id=${session['.id']}`]);
-      }
-
-      logger.info(`MikroTik user updated: ${username} → ${profile}`);
-      return { action: 'updated', username };
+    for (const u of existing) {
+      await client.write("/ip/hotspot/user/remove", [`=.id=${u[".id"]}`]);
     }
 
-    // Create new user
-    await client.write('/ip/hotspot/user/add', [
+    // Kick active sessions
+    const active = await client.write("/ip/hotspot/active/print", [
+      `?user=${username}`,
+    ]);
+    for (const s of active) {
+      await client.write("/ip/hotspot/active/remove", [`=.id=${s[".id"]}`]);
+    }
+
+    // Clear host entry (to avoid mac-binding issues)
+    const hosts = await client.write("/ip/hotspot/host/print", [
+      `?user=${username}`,
+    ]);
+    for (const h of hosts) {
+      await client.write("/ip/hotspot/host/remove", [`=.id=${h[".id"]}`]);
+    }
+
+    // ── Create Clean User ───────────────────────────────────────────────────
+    await client.write("/ip/hotspot/user/add", [
       `=name=${username}`,
       `=password=${password}`,
       `=profile=${profile}`,
       `=server=${HOTSPOT_SERVER}`,
-      `=uptime-limit=${formatUptime(durationSec)}`,
-      `=comment=Auto-provisioned ${new Date().toISOString()}`,
+      `=limit-uptime=${formatUptime(durationSec)}`,
+      `=comment=Paid ${new Date().toISOString()}`,
     ]);
 
-    logger.info(`MikroTik user created: ${username} → ${profile}`);
-    return { action: 'created', username };
-
+    logger.info(`MikroTik user provisioned [FRESH]: ${username} → ${profile}`);
+    return { action: "created", username };
   } finally {
     await closeClient(client);
   }
@@ -107,13 +108,13 @@ async function provisionUser(phone, profile, durationSec) {
 async function removeUser(phone) {
   const client = await getClient();
   try {
-    const existing = await client.write('/ip/hotspot/user/print', [
+    const existing = await client.write("/ip/hotspot/user/print", [
       `?name=${phone}`,
     ]);
     if (existing.length === 0) return false;
 
-    await client.write('/ip/hotspot/user/remove', [
-      `=.id=${existing[0]['.id']}`,
+    await client.write("/ip/hotspot/user/remove", [
+      `=.id=${existing[0][".id"]}`,
     ]);
     logger.info(`MikroTik user removed: ${phone}`);
     return true;
@@ -130,7 +131,7 @@ async function removeUser(phone) {
 async function getUserStatus(phone) {
   const client = await getClient();
   try {
-    const sessions = await client.write('/ip/hotspot/active/print', [
+    const sessions = await client.write("/ip/hotspot/active/print", [
       `?user=${phone}`,
     ]);
     if (sessions.length === 0) return { active: false };
@@ -151,7 +152,7 @@ function formatUptime(seconds) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = seconds % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
 module.exports = { provisionUser, removeUser, getUserStatus };

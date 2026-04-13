@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You are Online — WiFi Hotspot</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #00A651 0%, #007a3d 100%);
+            color: white;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card {
+            background: white;
+            color: #333;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+            width: 85%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .icon {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            margin: 0 0 15px 0;
+            color: #00A651;
+        }
+
+        .stats-box {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 20px 0;
+            text-align: left;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+
+        .label {
+            font-size: 0.8rem;
+            color: #666;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .value {
+            font-size: 1rem;
+            color: #111;
+            font-weight: 600;
+        }
+
+        .btn-browse {
+            display: inline-block;
+            width: 100%;
+            padding: 14px;
+            background: #00A651;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .btn-logout {
+            display: inline-block;
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #dc3545;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="card">
+        <div class="icon">🚀</div>
+        <h1>Welcome Online!</h1>
+        <p style="font-size: 0.9rem; color: #555;">Your internet access is active.</p>
+
+        <div class="stats-box">
+            <div class="stat-row">
+                <span class="label">Time Online</span>
+                <span class="value">$(uptime)</span>
+            </div>
+            <div class="stat-row">
+                <span class="label">Time Remaining</span>
+                <span class="value" style="color: #d32f2f;">$(session-time-left)</span>
+            </div>
+            <div class="stat-row">
+                <span class="label">Plan Max</span>
+                <span class="value">$(limit-uptime)</span>
+            </div>
+            <div class="stat-row">
+                <span class="label">Your IP</span>
+                <span class="value">$(ip)</span>
+            </div>
+        </div>
+
+        <a href="http://www.google.com" class="btn-browse">Start Browsing</a>
+
+        <form action="$(link-logout)" name="logout">
+            <button type="submit" class="btn-logout">Disconnect Device</button>
+        </form>
+    </div>
+
+    <p style="margin-top: 25px; font-size: 0.8rem; opacity: 0.8;">You can safely minimize this window.</p>
+
+</body>
+
+</html>
