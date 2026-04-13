@@ -10,6 +10,7 @@ const router = express.Router();
 const db = require("../config/db");
 const { getPackageByKey, listPackages } = require("../config/packages");
 const { initiateSTKPush, normalisePhone } = require("../services/mpesa");
+const { provisionUser } = require("../services/mikrotik");
 const logger = require("../services/logger");
 
 /**
@@ -137,6 +138,36 @@ router.get("/pay/status/:checkoutRequestId", async (req, res) => {
   }
 
   return res.json({ success: true, ...rows[0] });
+});
+
+/**
+ * POST /trial
+ * Provisions a free 3-minute trial.
+ * Body: { phone: "07..." }
+ */
+router.post("/trial", async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) {
+    return res.status(400).json({ success: false, message: "Phone required" });
+  }
+
+  try {
+    const profile = process.env.TRIAL_PROFILE || "trial";
+    const duration = parseInt(process.env.TRIAL_DURATION_MINUTES || "3") * 60;
+
+    await provisionUser(phone, profile, duration);
+
+    logger.info(`Trial provisioned for ${phone}`);
+    return res.json({
+      success: true,
+      message: "Trial activated! You have 3 minutes.",
+    });
+  } catch (err) {
+    logger.error(`Trial failed: ${err.message}`);
+    return res
+      .status(500)
+      .json({ success: false, message: "Could not activate trial" });
+  }
 });
 
 module.exports = router;
