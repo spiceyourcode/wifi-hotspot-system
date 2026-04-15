@@ -149,7 +149,7 @@ router.get("/status/:checkoutRequestId", async (req, res) => {
   const { checkoutRequestId } = req.params;
 
   const [rows] = await db.execute(
-    `SELECT status, package_key, amount FROM payments
+    `SELECT status, package_key, amount, phone FROM payments
      WHERE checkout_request_id = ? LIMIT 1`,
     [checkoutRequestId],
   );

@@ -133,48 +133,23 @@ router.post("/mpesa", async (req, res) => {
     return;
   }
 
-  // ── Mark payment successful ───────────────────────────────────────────────
-  await db.execute(
-    `UPDATE payments
-     SET status      = 'completed',
-         mpesa_code  = ?,
-         result_desc = ?,
-         amount      = ?
-     WHERE id = ?`,
-    [mpesaCode, ResultDesc, paidAmount, payment.id],
-  );
-
-  logger.info(
-    `Payment confirmed ${mpesaCode} KES ${paidAmount} → ${payment.phone} [${pkg.profile}]`,
-  );
-
-  // ── Upsert user in users table ────────────────────────────────────────────
-  const [existingUser] = await db.execute(
-    `SELECT id FROM users WHERE phone = ? LIMIT 1`,
-    [payment.phone],
-  );
-
-  let userId;
-  if (existingUser.length > 0) {
-    userId = existingUser[0].id;
-    await db.execute(
-      `UPDATE users SET profile = ?, updated_at = NOW() WHERE id = ?`,
-      [pkg.profile, userId],
-    );
-  } else {
-    const [insertResult] = await db.execute(
-      `INSERT INTO users (phone, profile) VALUES (?, ?)`,
-      [payment.phone, pkg.profile],
-    );
-    userId = insertResult.insertId;
-  }
-
   // ── Provision MikroTik user ───────────────────────────────────────────────
   try {
     const result = await provisionUser(
       payment.phone,
       pkg.profile,
       pkg.durationSec,
+    );
+
+    // ── Mark payment successful ONLY AFTER PROVISIONING SUCCEEDED ───────────────
+    await db.execute(
+      `UPDATE payments
+       SET status      = 'completed',
+           mpesa_code  = ?,
+           result_desc = ?,
+           amount      = ?
+       WHERE id = ?`,
+      [mpesaCode, ResultDesc, paidAmount, payment.id],
     );
 
     // Log session start

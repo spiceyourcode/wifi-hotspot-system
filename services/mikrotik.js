@@ -87,9 +87,7 @@ async function provisionUser(phone, profile, durationSec) {
       `=name=${username}`,
       `=password=${password}`,
       `=profile=${profile}`,
-      `=server=${HOTSPOT_SERVER}`,
       `=limit-uptime=${formatUptime(durationSec)}`,
-      `=comment=Paid ${new Date().toISOString()}`,
     ]);
 
     logger.info(`MikroTik user provisioned [FRESH]: ${username} → ${profile}`);

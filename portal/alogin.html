@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>You are Online — WiFi Hotspot</title>
+    <meta http-equiv="refresh" content="2; url=$(link-status)">
+    <title>Login Successful — WiFi Hotspot</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -30,70 +31,45 @@
         }
 
         .icon {
-            font-size: 3.5rem;
-            margin-bottom: 10px;
+            font-size: 4rem;
+            margin-bottom: 20px;
+            animation: bounce 1s infinite alternate;
+        }
+
+        @keyframes bounce {
+            from {
+                transform: translateY(0);
+            }
+
+            to {
+                transform: translateY(-10px);
+            }
         }
 
         h1 {
-            font-size: 1.5rem;
-            margin: 0 0 15px 0;
+            font-size: 1.8rem;
+            margin: 0 0 10px 0;
             color: #00A651;
         }
 
-        .stats-box {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 15px;
-            margin: 20px 0;
-            text-align: left;
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #00A651;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
         }
 
-        .stat-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #eee;
-        }
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
 
-        .stat-row:last-child {
-            border-bottom: none;
-        }
-
-        .label {
-            font-size: 0.8rem;
-            color: #666;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .value {
-            font-size: 1rem;
-            color: #111;
-            font-weight: 600;
-        }
-
-        .btn-browse {
-            display: inline-block;
-            width: 100%;
-            padding: 14px;
-            background: #00A651;
-            color: white;
-            text-decoration: none;
-            border-radius: 10px;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-
-        .btn-logout {
-            display: inline-block;
-            margin-top: 15px;
-            font-size: 0.85rem;
-            color: #dc3545;
-            text-decoration: none;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            background: none;
+            100% {
+                transform: rotate(360deg);
+            }
         }
     </style>
 </head>
@@ -101,37 +77,12 @@
 <body>
 
     <div class="card">
-        <div class="icon">🚀</div>
-        <h1>Welcome Online!</h1>
-        <p style="font-size: 0.9rem; color: #555;">Your internet access is active.</p>
-
-        <div class="stats-box">
-            <div class="stat-row">
-                <span class="label">Time Online</span>
-                <span class="value">$(uptime)</span>
-            </div>
-            <div class="stat-row">
-                <span class="label">Time Remaining</span>
-                <span class="value" style="color: #d32f2f;">$(session-time-left)</span>
-            </div>
-            <div class="stat-row">
-                <span class="label">Plan Max</span>
-                <span class="value">$(limit-uptime)</span>
-            </div>
-            <div class="stat-row">
-                <span class="label">Your IP</span>
-                <span class="value">$(ip)</span>
-            </div>
-        </div>
-
-        <a href="http://www.google.com" class="btn-browse">Start Browsing</a>
-
-        <form action="$(link-logout)" name="logout">
-            <button type="submit" class="btn-logout">Disconnect Device</button>
-        </form>
+        <div class="icon">✅</div>
+        <h1>Login Successful!</h1>
+        <p>Your device is now authorized.</p>
+        <div class="loader"></div>
+        <p style="font-size: 0.8rem; color: #777;">Redirecting to status page...</p>
     </div>
-
-    <p style="margin-top: 25px; font-size: 0.8rem; opacity: 0.8;">You can safely minimize this window.</p>
 
 </body>
 
