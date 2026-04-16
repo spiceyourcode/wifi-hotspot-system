@@ -10,7 +10,7 @@ const router = express.Router();
 const db = require("../config/db");
 const { getPackageByKey, listPackages } = require("../config/packages");
 const { initiateSTKPush, normalisePhone } = require("../services/mpesa");
-const { provisionUser } = require("../services/mikrotik");
+const { provisionUser, getMacByIp } = require("../services/mikrotik");
 const logger = require("../services/logger");
 
 router.get("/packages", (_req, res) => {
@@ -186,8 +186,24 @@ router.post("/trial", async (req, res) => {
       .json({ success: false, message: "Invalid phone format" });
   }
 
+  // Detect IP and lookup MAC
+  const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
+  // Express usually returns ::ffff:192.168.88.x, clean it up
+  const cleanIp = clientIp.replace(/^.*:/, "");
+
   try {
-    const [existingTrials] = await db.execute(
+    const mac = await getMacByIp(cleanIp);
+    if (!mac) {
+      logger.warn(`Could not find MAC for IP: ${cleanIp}`);
+      return res.status(400).json({
+        success: false,
+        message:
+          "Network error: Could not identify your device. Please reconnect.",
+      });
+    }
+
+    // 1. Check if PHONE has used a trial in 24h
+    const [existingPhone] = await db.execute(
       `SELECT id FROM payments 
        WHERE phone = ? AND package_key = 'trial' 
        AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
@@ -195,7 +211,7 @@ router.post("/trial", async (req, res) => {
       [normPhone],
     );
 
-    if (existingTrials.length > 0) {
+    if (existingPhone.length > 0) {
       return res.status(403).json({
         success: false,
         message:
@@ -203,22 +219,51 @@ router.post("/trial", async (req, res) => {
       });
     }
 
+    // 2. Check if MAC has used a trial in 24h (THE HARDENER)
+    const [existingMac] = await db.execute(
+      `SELECT phone FROM users WHERE mac_address = ? AND trial_used = 1 LIMIT 1`,
+      [mac],
+    );
+
+    if (existingMac.length > 0) {
+      logger.warn(
+        `Trial block: MAC ${mac} tried another trial with ${normPhone}`,
+      );
+      return res.status(403).json({
+        success: false,
+        message:
+          "This device has already used its free trial. Please purchase a package.",
+      });
+    }
+
     const profile = process.env.TRIAL_PROFILE || "trial";
     const duration = parseInt(process.env.TRIAL_DURATION_MINUTES || "3") * 60;
 
+    // Record the trial
     await db.execute(
       `INSERT INTO payments (id, phone, amount, package_key, status)
        VALUES (UUID(), ?, 0, 'trial', 'completed')`,
       [normPhone],
     );
 
+    // Bind MAC to user and mark trial used
+    await db.execute(
+      `INSERT INTO users (phone, mac_address, profile, trial_used) 
+       VALUES (?, ?, ?, 1) 
+       ON DUPLICATE KEY UPDATE 
+         mac_address = VALUES(mac_address), 
+         profile = VALUES(profile),
+         trial_used = 1`,
+      [normPhone, mac, profile],
+    );
+
     await provisionUser(normPhone, profile, duration);
 
-    logger.info(`Trial activated for ${normPhone}`);
+    logger.info(`Trial activated for ${normPhone} [MAC: ${mac}]`);
     return res.json({
       success: true,
       message: "Trial activated! You have 3 minutes.",
-      username: normPhone, // SEND THIS TO FRONTEND
+      username: normPhone,
     });
   } catch (err) {
     logger.error(`Trial failed: ${err.message}`);

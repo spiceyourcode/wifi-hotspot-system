@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="refresh" content="2; url=$(link-status)">
+    <meta http-equiv="refresh" content="5; url=$(link-status)">
     <title>Session Status — WiFi Hotspot</title>
     <style>
         body {
@@ -133,13 +133,14 @@
         </form>
     </div>
 
-    <p style="margin-top: 25px; font-size: 0.8rem; opacity: 0.8;">Page refreshes every 2s</p>
+    <p style="margin-top: 25px; font-size: 0.8rem; opacity: 0.8;">Page refreshes every 5s</p>
 
     <script>
+        // High-speed session heartbeat
         // If the session expires, MikroTik stops replacing the $(username) variable.
-        // This script detects that and redirects the user back to buy a new package.
         const user = "$(username)";
         if (!user || user.startsWith("$(")) {
+            console.log("Session expired. Redirecting...");
             window.location.href = "login.html";
         }
     </script>

@@ -142,6 +142,24 @@ async function getUserStatus(phone) {
 }
 
 /**
+ * Find the MAC address for a given IP status. Queries the RouterOS host table.
+ * @param {string} ip
+ * @returns {Promise<string|null>} MAC address (e.g. 00:AA:BB:CC:DD:EE)
+ */
+async function getMacByIp(ip) {
+  const client = await getClient();
+  try {
+    const hosts = await client.write("/ip/hotspot/host/print", [
+      `?address=${ip}`,
+    ]);
+    if (hosts.length === 0) return null;
+    return hosts[0]["mac-address"];
+  } finally {
+    await closeClient(client);
+  }
+}
+
+/**
  * Convert seconds into MikroTik uptime-limit format: HH:MM:SS
  * @param {number} seconds
  * @returns {string}
@@ -159,4 +177,5 @@ module.exports = {
   getUserStatus,
   getClient,
   closeClient,
+  getMacByIp,
 };
