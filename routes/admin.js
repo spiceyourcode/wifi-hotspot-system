@@ -1,123 +1,98 @@
 // routes/admin.js
-// Protected admin endpoints for operations/debugging
-// Protect with IP allowlist or HTTP Basic Auth in production (Nginx)
+// Admin dashboard logic — revenue stats & real-time hotspot monitoring
 
 "use strict";
 
 const express = require("express");
 const router = express.Router();
-
 const db = require("../config/db");
-const { getPackageByKey } = require("../config/packages");
-const {
-  provisionUser,
-  removeUser,
-  getUserStatus,
-} = require("../services/mikrotik");
+const { getClient, closeClient } = require("../services/mikrotik");
 const logger = require("../services/logger");
 
-// Simple bearer-token guard — set ADMIN_TOKEN in .env
-router.use((req, res, next) => {
-  const authHeader = req.headers.authorization || "";
-  const token = authHeader.replace("Bearer ", "");
-  if (!process.env.ADMIN_TOKEN || token !== process.env.ADMIN_TOKEN) {
-    return res.status(401).json({ success: false, message: "Unauthorized" });
+// Simple Auth Middleware
+const adminAuth = (req, res, next) => {
+  const authHeader = req.headers["authorization"];
+  if (authHeader === "Bearer hotspot-admin-secret-2024") {
+    next();
+  } else {
+    res.status(401).json({ success: false, message: "Unauthorized" });
   }
-  next();
-});
+};
 
 /**
- * POST /admin/provision
- * Manually retry MikroTik provisioning for a completed payment.
- * Body: { phone: "254712345678", package: "1hr" }
+ * GET /admin/stats
+ * Aggregated revenue and user counts
  */
-router.post("/provision", async (req, res) => {
-  const { phone, package: pkgKey } = req.body;
-  const pkg = getPackageByKey(pkgKey);
-  if (!pkg)
-    return res.status(400).json({ success: false, message: "Invalid package" });
-
+router.get("/stats", adminAuth, async (req, res) => {
   try {
-    const result = await provisionUser(phone, pkg.profile, pkg.durationSec);
-    logger.info(`Admin manual provision: ${phone} → ${pkg.profile}`);
-    return res.json({ success: true, ...result });
+    const [[revenue]] = await db.execute(`
+      SELECT 
+        SUM(CASE WHEN created_at >= CURDATE() THEN amount ELSE 0 END) as today,
+        SUM(CASE WHEN created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) THEN amount ELSE 0 END) as week,
+        SUM(amount) as total
+      FROM payments WHERE status = 'completed'
+    `);
+
+    const [[users]] = await db.execute(`SELECT COUNT(*) as count FROM users`);
+
+    res.json({
+      success: true,
+      revenue: {
+        today: Number(revenue.today || 0),
+        week: Number(revenue.week || 0),
+        total: Number(revenue.total || 0),
+      },
+      totalUsers: users.count,
+    });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    logger.error("Admin stats error:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
 /**
- * DELETE /admin/user/:phone
- * Remove a hotspot user from MikroTik.
+ * GET /admin/payments
+ * Recent transaction history
  */
-router.delete("/user/:phone", async (req, res) => {
+router.get("/payments", adminAuth, async (req, res) => {
   try {
-    const removed = await removeUser(req.params.phone);
-    return res.json({ success: true, removed });
+    const [rows] = await db.execute(`
+      SELECT phone, amount, package_key, status, created_at 
+      FROM payments 
+      ORDER BY created_at DESC LIMIT 50
+    `);
+    res.json({ success: true, payments: rows });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false });
   }
 });
 
 /**
- * GET /admin/user/:phone/status
- * Check MikroTik active session for a user.
+ * GET /admin/active-users
+ * Real-time list of MikroTik active sessions
  */
-router.get("/user/:phone/status", async (req, res) => {
+router.get("/active-users", adminAuth, async (req, res) => {
+  let client;
   try {
-    const status = await getUserStatus(req.params.phone);
-    return res.json({ success: true, ...status });
+    client = await getClient();
+    const active = await client.write("/ip/hotspot/active/print");
+
+    // Clean up response for dashboard
+    const list = active.map((u) => ({
+      user: u.user,
+      address: u.address,
+      mac: u["mac-address"],
+      uptime: u.uptime,
+      id: u[".id"],
+    }));
+
+    res.json({ success: true, activeUsers: list });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    logger.error("MikroTik active users fetch failure:", err);
+    res.status(500).json({ success: false, message: "Router API unreachable" });
+  } finally {
+    if (client) await closeClient(client);
   }
-});
-
-/**
- * GET /admin/failures
- * List unresolved provisioning failures.
- */
-router.get("/failures", async (_req, res) => {
-  const [rows] = await db.execute(
-    `SELECT * FROM provisioning_failures
-     WHERE resolved = 0
-     ORDER BY created_at DESC LIMIT 50`,
-  );
-  return res.json({ success: true, failures: rows });
-});
-
-/**
- * PATCH /admin/failures/:id/resolve
- */
-router.patch("/failures/:id/resolve", async (req, res) => {
-  await db.execute(
-    `UPDATE provisioning_failures SET resolved = 1 WHERE id = ?`,
-    [req.params.id],
-  );
-  return res.json({ success: true });
-});
-
-/**
- * GET /admin/payments?page=1&limit=20
- * Recent payment history.
- */
-router.get("/payments", async (req, res) => {
-  const page = Math.max(1, parseInt(req.query.page || "1", 10));
-  const limit = Math.min(100, parseInt(req.query.limit || "20", 10));
-  const offset = (page - 1) * limit;
-
-  // NOTE: LIMIT/OFFSET must be interpolated — mysql2 prepared statements
-  // (execute) reject them as ? placeholders in MySQL 8+. Safe because both
-  // values are sanitised integers (parseInt + Math.min/max above).
-  const [rows] = await db.execute(
-    `SELECT id, phone, amount, package_key, mpesa_code, status, created_at
-     FROM payments
-     ORDER BY created_at DESC
-     LIMIT ${limit} OFFSET ${offset}`,
-  );
-  const [[{ total }]] = await db.execute(
-    `SELECT COUNT(*) AS total FROM payments`,
-  );
-  return res.json({ success: true, payments: rows, total, page, limit });
 });
 
 module.exports = router;
