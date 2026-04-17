@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  # --- The Hotspot API Server ---
+  app:
+    build: .
+    container_name: hotspot-api
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=hotspot_user
+      - DB_PASSWORD=StrongPassword123!
+      - DB_NAME=hotspot_db
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # --- The Database Server ---
+  db:
+    image: mysql:8.0
+    container_name: hotspot-db
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: hotspot_db
+      MYSQL_USER: hotspot_user
+      MYSQL_PASSWORD: StrongPassword123!
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+volumes:
+  mysql_data:

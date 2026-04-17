@@ -106,6 +106,18 @@ router.post("/", async (req, res) => {
     [txnId, normPhone, pkg.amount, pkgKey],
   );
 
+  // Bind MAC to user if provided
+  const reqMac = req.body.mac;
+  if (reqMac) {
+    await db
+      .execute(
+        `INSERT INTO users (phone, mac_address) VALUES (?, ?) 
+       ON DUPLICATE KEY UPDATE mac_address = VALUES(mac_address)`,
+        [normPhone, reqMac],
+      )
+      .catch((e) => logger.warn(`Could not sync MAC on payment: ${e.message}`));
+  }
+
   // ── Fire STK Push ───────────────────────────────────────────────────────
   try {
     const stkResult = await initiateSTKPush(normPhone, pkg.amount, pkgKey);
@@ -188,13 +200,17 @@ router.post("/trial", async (req, res) => {
 
   // Detect IP and lookup MAC
   const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
-  // Express usually returns ::ffff:192.168.88.x, clean it up
   const cleanIp = clientIp.replace(/^.*:/, "");
+  let mac = req.body.mac; // Prefer MAC from portal handshake
 
   try {
-    const mac = await getMacByIp(cleanIp);
+    // Fallback to router lookup if portal didn't provide it (local mode)
     if (!mac) {
-      logger.warn(`Could not find MAC for IP: ${cleanIp}`);
+      mac = await getMacByIp(cleanIp);
+    }
+
+    if (!mac) {
+      logger.warn(`Could not identify device for IP: ${cleanIp}`);
       return res.status(400).json({
         success: false,
         message:

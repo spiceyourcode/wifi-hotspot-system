@@ -348,8 +348,12 @@
 
   <script>
     // ── Configuration ────────────────────────────────────────────────────────
-    // Replace this with your laptop's actual LAN IP:
-    const API_BASE = "http://192.168.88.254:3000";
+    // For VPS: Replace this with your Google Cloud Public IP or Domain
+    const API_BASE   = "https://unhoodwinked-preluxurious-korey.ngrok-free.dev"; 
+    
+    // Captured directly from MikroTik template variables
+    const CLIENT_IP  = "$(ip)";
+    const CLIENT_MAC = "$(mac)";
 
     /**
      * Automatically log into MikroTik after provisioning
@@ -443,7 +447,11 @@
         const res = await fetch(`${API_BASE}/pay/trial`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone }),
+          body: JSON.stringify({ 
+            phone,
+            ip: CLIENT_IP,
+            mac: CLIENT_MAC
+          }),
         });
         const data = await res.json();
 
@@ -481,7 +489,12 @@
         const res = await fetch(`${API_BASE}/pay`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone, package: selectedPackage }),
+          body: JSON.stringify({ 
+            phone, 
+            package: selectedPackage,
+            ip: CLIENT_IP,
+            mac: CLIENT_MAC
+          }),
         });
         const data = await res.json();
 

@@ -12,8 +12,10 @@ const logger = require("../services/logger");
 // Simple Auth Middleware
 const adminAuth = (req, res, next) => {
   const authHeader = req.headers["authorization"];
-  if (authHeader === "Bearer hotspot-admin-secret-2024") {
-    next();
+  const adminToken = process.env.ADMIN_TOKEN || "hotspot-admin-secret-2024";
+
+  if (authHeader === `Bearer ${adminToken}`) {
+    return next();
   } else {
     res.status(401).json({ success: false, message: "Unauthorized" });
   }
