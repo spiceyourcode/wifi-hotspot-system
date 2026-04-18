@@ -1,6 +1,5 @@
 // server.js
-// WiFi Hotspot Monetization System — Entry Point
-// Author: Production-ready implementation
+// WiFi Hotspot Monetization System
 // Usage: node server.js  |  pm2 start server.js --name hotspot-api
 
 "use strict";
