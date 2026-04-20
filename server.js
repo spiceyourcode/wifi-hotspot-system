@@ -20,7 +20,6 @@ const paymentRoutes = require("./routes/payment");
 const callbackRoutes = require("./routes/callback");
 const adminRoutes = require("./routes/admin");
 
-// ── Ensure logs directory exists ──────────────────────────────────────────
 const logsDir = path.join(__dirname, "logs");
 if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
 
