@@ -1,4 +1,3 @@
-// check_db.js
 require("dotenv").config();
 const mysql = require("mysql2/promise");
 
