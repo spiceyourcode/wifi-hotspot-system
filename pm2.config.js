@@ -8,9 +8,9 @@ module.exports = {
     {
       name: "hotspot-api",
       script: "./server.js",
-      instances: "max", // use all CPU cores
-      exec_mode: "cluster", // cluster mode for zero-downtime reload
-      watch: false, // disable in production
+      instances: "max",
+      exec_mode: "cluster", 
+      watch: false, 
       max_memory_restart: "500M",
 
       env: {
