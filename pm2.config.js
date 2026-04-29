@@ -1,7 +1,3 @@
-// pm2.config.js
-// PM2 process manager configuration
-// Start: pm2 start pm2.config.js
-// Save:  pm2 save && pm2 startup
 
 module.exports = {
   apps: [
