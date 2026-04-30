@@ -1,64 +1,27 @@
 // routes/payment.js
-// POST /pay — validate input, record pending payment, fire STK Push
+// Logic for handling trial activations and initiating M-Pesa payments
 
 "use strict";
 
 const express = require("express");
-const { v4: uuidv4 } = require("uuid");
 const router = express.Router();
-
 const db = require("../config/db");
-const { getPackageByKey, listPackages } = require("../config/packages");
-const { initiateSTKPush, normalisePhone } = require("../services/mpesa");
+const { getPackageByKey } = require("../config/packages");
+const {
+  normalisePhone,
+  initiateSTKPush,
+  generateTransactionId,
+} = require("../services/mpesa");
 const { provisionUser, getMacByIp } = require("../services/mikrotik");
 const logger = require("../services/logger");
 
-router.get("/packages", (_req, res) => {
-  res.json({ success: true, packages: listPackages() });
-});
-
-/**
- * GET /status/check/:phone
- * Returns plan info if the user has an active/paid session.
- */
-router.get("/admin/status/:phone", async (req, res) => {
-  const { phone } = req.params;
-  let normPhone;
-  try {
-    normPhone = normalisePhone(phone);
-  } catch (e) {
-    return res.json({ active: false });
-  }
-
-  const [rows] = await db.execute(
-    `SELECT package_key, created_at FROM payments 
-     WHERE phone = ? AND status = 'completed' 
-       AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
-     ORDER BY created_at DESC LIMIT 1`,
-    [normPhone],
-  );
-
-  if (rows.length === 0) return res.json({ active: false });
-
-  // In a real prod environment, you'd check vs durationSec
-  // For now, if they paid in last 7 days, we let them attempt a login (MikroTik will deny if limit reached)
-  res.json({ active: true, package: rows[0].package_key });
-});
-
 /**
  * POST /pay
- * Body: { phone: "0712345678", package: "1hr" }
- *
- * 1. Validates phone + package
- * 2. Guards against duplicate pending transactions (same phone in last 2 min)
- * 3. Inserts a PENDING payment record
- * 4. Fires STK Push
- * 5. Returns checkout request ID for frontend polling
+ * Initiates an M-Pesa payment for a data package.
  */
 router.post("/", async (req, res) => {
   const { phone, package: pkgKey } = req.body;
 
-  // ── Input validation ────────────────────────────────────────────────────
   if (!phone || !pkgKey) {
     return res
       .status(400)
@@ -69,116 +32,66 @@ router.post("/", async (req, res) => {
   try {
     normPhone = normalisePhone(phone);
   } catch (e) {
-    return res.status(400).json({ success: false, message: e.message });
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid phone format" });
   }
 
   const pkg = getPackageByKey(pkgKey);
   if (!pkg) {
-    return res.status(400).json({
-      success: false,
-      message: `Invalid package. Available: ${listPackages()
-        .map((p) => p.key)
-        .join(", ")}`,
-    });
+    return res.status(400).json({ success: false, message: "Invalid package" });
   }
 
-  // ── Duplicate-pending guard (2-minute window) ───────────────────────────
-  const [pendingRows] = await db.execute(
-    `SELECT id FROM payments
-     WHERE phone = ? AND status = 'pending'
-       AND created_at > DATE_SUB(NOW(), INTERVAL 2 MINUTE)
-     LIMIT 1`,
-    [normPhone],
-  );
-  if (pendingRows.length > 0) {
-    return res.status(429).json({
-      success: false,
-      message:
-        "A payment is already pending for this number. Please wait ~2 minutes.",
-    });
-  }
+  const txnId = generateTransactionId();
 
-  // ── Insert pending record ───────────────────────────────────────────────
-  const txnId = uuidv4();
-  await db.execute(
-    `INSERT INTO payments (id, phone, amount, package_key, status)
-     VALUES (?, ?, ?, ?, 'pending')`,
-    [txnId, normPhone, pkg.amount, pkgKey],
-  );
-
-  // Bind MAC to user if provided
-  const reqMac = req.body.mac;
-  if (reqMac) {
-    await db
-      .execute(
-        `INSERT INTO users (phone, mac_address) VALUES (?, ?) 
-       ON DUPLICATE KEY UPDATE mac_address = VALUES(mac_address)`,
-        [normPhone, reqMac],
-      )
-      .catch((e) => logger.warn(`Could not sync MAC on payment: ${e.message}`));
-  }
-
-  // ── Fire STK Push ───────────────────────────────────────────────────────
   try {
+    logger.info(`Starting payment process for ${normPhone} [${pkgKey}]`);
+
+    // Record initial payment attempt
+    await db.execute(
+      `INSERT INTO payments (id, phone, amount, package_key, status)
+       VALUES (?, ?, ?, ?, 'pending')`,
+      [txnId, normPhone, pkg.amount, pkgKey],
+    );
+
+    // Bind MAC to user if provided (valuable for cloud identifying)
+    const reqMac = req.body.mac;
+    if (reqMac) {
+      await db
+        .execute(
+          `INSERT INTO users (phone, mac_address) VALUES (?, ?) 
+         ON DUPLICATE KEY UPDATE mac_address = VALUES(mac_address)`,
+          [normPhone, reqMac],
+        )
+        .catch((e) =>
+          logger.warn(`Could not sync MAC on payment: ${e.message}`),
+        );
+    }
+
+    // ── Fire STK Push ──
     const stkResult = await initiateSTKPush(normPhone, pkg.amount, pkgKey);
 
-    // Store the CheckoutRequestID so we can match the callback
-    await db.execute(
-      `UPDATE payments SET checkout_request_id = ? WHERE id = ?`,
-      [stkResult.CheckoutRequestID, txnId],
-    );
-
     logger.info(
-      `STK Push sent → ${normPhone} KES ${pkg.amount} [${pkgKey}] CRQ:${stkResult.CheckoutRequestID}`,
+      `STK Push sent → ${normPhone} [${pkgKey}] CRQ:${stkResult.CheckoutRequestID}`,
     );
 
-    return res.json({
+    res.json({
       success: true,
-      message: `Payment prompt sent to ${phone}. Enter your M-Pesa PIN.`,
-      checkoutRequestId: stkResult.CheckoutRequestID,
-      amount: pkg.amount,
-      package: pkg.name,
-      username: normPhone,
+      message: "Payment initiated! Check your phone for the M-Pesa prompt.",
+      checkoutId: stkResult.CheckoutRequestID,
     });
   } catch (err) {
-    // Roll back pending record on STK failure
-    await db.execute(`UPDATE payments SET status = 'failed' WHERE id = ?`, [
-      txnId,
-    ]);
-    logger.error(`STK Push failed for ${normPhone}: ${err.message}`);
-
-    return res.status(502).json({
+    logger.error(`❌ Payment initiation failure: ${err.message}`);
+    res.status(500).json({
       success: false,
-      message: "Could not send payment prompt. Please try again.",
+      message: "Payment system error. Please try again.",
     });
   }
-});
-
-/**
- * GET /status/:checkoutRequestId
- */
-router.get("/status/:checkoutRequestId", async (req, res) => {
-  const { checkoutRequestId } = req.params;
-
-  const [rows] = await db.execute(
-    `SELECT status, package_key, amount, phone FROM payments
-     WHERE checkout_request_id = ? LIMIT 1`,
-    [checkoutRequestId],
-  );
-
-  if (rows.length === 0) {
-    return res
-      .status(404)
-      .json({ success: false, message: "Transaction not found" });
-  }
-
-  return res.json({ success: true, ...rows[0], username: rows[0].phone });
 });
 
 /**
  * POST /trial
  * Provisions a free 3-minute trial.
- * Body: { phone: "07..." }
  */
 router.post("/trial", async (req, res) => {
   const { phone } = req.body;
@@ -201,16 +114,21 @@ router.post("/trial", async (req, res) => {
   // Detect IP and lookup MAC
   const clientIp = req.headers["x-forwarded-for"] || req.socket.remoteAddress;
   const cleanIp = clientIp.replace(/^.*:/, "");
-  let mac = req.body.mac; // Prefer MAC from portal handshake
+  let mac = req.body.mac; // Prefer MAC from portal handshake (Cloud compatible)
+
+  logger.info(
+    `Starting trial for ${phone} (IP: ${cleanIp}, MAC: ${mac || "PROBING"})`,
+  );
 
   try {
     // Fallback to router lookup if portal didn't provide it (local mode)
     if (!mac) {
       mac = await getMacByIp(cleanIp);
+      logger.info(`Resolved MAC via router probe: ${mac}`);
     }
 
     if (!mac) {
-      logger.warn(`Could not identify device for IP: ${cleanIp}`);
+      logger.warn(`Hardware ID failed for IP: ${cleanIp}`);
       return res.status(400).json({
         success: false,
         message:
@@ -230,12 +148,11 @@ router.post("/trial", async (req, res) => {
     if (existingPhone.length > 0) {
       return res.status(403).json({
         success: false,
-        message:
-          "You have already used your free trial for today. Please purchase a package.",
+        message: "You have already used your free trial for today.",
       });
     }
 
-    // 2. Check if MAC has used a trial in 24h (THE HARDENER)
+    // 2. Check if MAC has used a trial in 24h (Hardware Lock)
     const [existingMac] = await db.execute(
       `SELECT phone FROM users WHERE mac_address = ? AND trial_used = 1 LIMIT 1`,
       [mac],
@@ -247,22 +164,25 @@ router.post("/trial", async (req, res) => {
       );
       return res.status(403).json({
         success: false,
-        message:
-          "This device has already used its free trial. Please purchase a package.",
+        message: "This device has already used its free trial.",
       });
     }
 
     const profile = process.env.TRIAL_PROFILE || "trial";
     const duration = parseInt(process.env.TRIAL_DURATION_MINUTES || "3") * 60;
 
-    // Record the trial
+    // ── Provision on Router ──
+    logger.info(`Provisioning trial for ${normPhone} on MikroTik...`);
+    await provisionUser(normPhone, profile, duration);
+
+    // ── Update DB ──
+    logger.info(`Recording trial in database for ${normPhone}...`);
     await db.execute(
       `INSERT INTO payments (id, phone, amount, package_key, status)
        VALUES (UUID(), ?, 0, 'trial', 'completed')`,
       [normPhone],
     );
 
-    // Bind MAC to user and mark trial used
     await db.execute(
       `INSERT INTO users (phone, mac_address, profile, trial_used) 
        VALUES (?, ?, ?, 1) 
@@ -273,19 +193,25 @@ router.post("/trial", async (req, res) => {
       [normPhone, mac, profile],
     );
 
-    await provisionUser(normPhone, profile, duration);
-
-    logger.info(`Trial activated for ${normPhone} [MAC: ${mac}]`);
+    logger.info(
+      `✅ Trial activated successfully for ${normPhone} [MAC: ${mac}]`,
+    );
     return res.json({
       success: true,
       message: "Trial activated! You have 3 minutes.",
       username: normPhone,
     });
   } catch (err) {
-    logger.error(`Trial failed: ${err.message}`);
-    return res
-      .status(500)
-      .json({ success: false, message: "Could not activate trial" });
+    logger.error(`❌ Trial failure for ${normPhone}: ${err.message}`, {
+      stack: err.stack,
+    });
+
+    let userMsg = "Could not activate trial. Please try again.";
+    if (err.errno === "SOCKTMOUT" || err.name === "RosException") {
+      userMsg = "Router communication error. Please check router API status.";
+    }
+
+    res.status(500).json({ success: false, message: userMsg });
   }
 });
 

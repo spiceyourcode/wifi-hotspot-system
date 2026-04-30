@@ -97,4 +97,28 @@ router.get("/active-users", adminAuth, async (req, res) => {
   }
 });
 
+/**
+ * GET /admin/status/:phone
+ * Checks if a specific device has an active paid session
+ * Used by the login portal for "Comeback" recognition
+ */
+router.get("/status/:phone", async (req, res) => {
+  const { phone } = req.params;
+  try {
+    const [rows] = await db.execute(
+      `SELECT package_key, created_at FROM payments 
+       WHERE phone = ? AND status = 'completed' AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+       ORDER BY created_at DESC LIMIT 1`,
+      [phone],
+    );
+
+    if (rows.length > 0) {
+      return res.json({ active: true, package: rows[0].package_key });
+    }
+    res.json({ active: false });
+  } catch (err) {
+    res.status(500).json({ active: false });
+  }
+});
+
 module.exports = router;
