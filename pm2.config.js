@@ -26,7 +26,7 @@ module.exports = {
       merge_logs: true,
 
       // Zero-downtime reload
-      kill_timeout: 5000, // wait 5s for graceful shutdown
+      kill_timeout: 5000, 
     },
   ],
 };
