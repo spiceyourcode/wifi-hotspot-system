@@ -15,7 +15,7 @@ module.exports = {
       },
 
       // Auto-restart on crash
-      restart_delay: 5000, // wait 5s before restart
+      restart_delay: 5000,
       max_restarts: 10,
       min_uptime: "10s",
 
