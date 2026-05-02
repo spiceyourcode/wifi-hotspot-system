@@ -1,8 +1,4 @@
--- =============================================================
---  HOTSPOT MONETIZATION SYSTEM — MySQL Schema
---  Engine: InnoDB | Charset: utf8mb4 | Timezone: EAT (+03:00)
---  Run:  mysql -u root -p < schema.sql
--- =============================================================
+
 
 CREATE DATABASE IF NOT EXISTS hotspot_db
   CHARACTER SET utf8mb4
