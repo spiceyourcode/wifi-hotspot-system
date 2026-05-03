@@ -1,6 +1,3 @@
-// routes/admin.js
-// Admin dashboard logic — revenue stats & real-time hotspot monitoring
-
 "use strict";
 
 const express = require("express");
