@@ -1,7 +1,3 @@
-// config/packages.js
-// Single source of truth for all internet packages.
-// To add a new package, add an entry here — no other file needs changing.
-
 "use strict";
 
 /**
