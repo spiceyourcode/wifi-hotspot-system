@@ -48,7 +48,8 @@ router.post("/", async (req, res) => {
     logger.info(`Starting payment process for ${normPhone} [${pkgKey}]`);
 
     // Record initial payment attempt
-    await db.execute(
+    // Note: checkout_request_id will be filled after the STK push
+    const [insResult] = await db.execute(
       `INSERT INTO payments (id, phone, amount, package_key, status)
        VALUES (?, ?, ?, ?, 'pending')`,
       [txnId, normPhone, pkg.amount, pkgKey],
@@ -71,6 +72,12 @@ router.post("/", async (req, res) => {
     // ── Fire STK Push ──
     const stkResult = await initiateSTKPush(normPhone, pkg.amount, pkgKey);
 
+    // ── Update with the real ID from Safaricom ──
+    await db.execute(
+      `UPDATE payments SET checkout_request_id = ? WHERE id = ?`,
+      [stkResult.CheckoutRequestID, txnId],
+    );
+
     logger.info(
       `STK Push sent → ${normPhone} [${pkgKey}] CRQ:${stkResult.CheckoutRequestID}`,
     );
@@ -86,6 +93,35 @@ router.post("/", async (req, res) => {
       success: false,
       message: "Payment system error. Please try again.",
     });
+  }
+});
+
+/**
+ * GET /status/:phone (mounted at /pay/status/:phone)
+ */
+router.get("/status/:phone", async (req, res) => {
+  const { phone } = req.params;
+  let normPhone;
+  try {
+    normPhone = normalisePhone(phone);
+  } catch (e) {
+    normPhone = phone;
+  }
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT status, package_key FROM payments 
+       WHERE (phone = ? OR phone = ?) AND status = 'completed' AND created_at > DATE_SUB(NOW(), INTERVAL 2 HOUR)
+       ORDER BY created_at DESC LIMIT 1`,
+      [phone, normPhone],
+    );
+
+    if (rows.length > 0) {
+      return res.json({ success: true, active: true, username: normPhone });
+    }
+    res.json({ success: true, active: false });
+  } catch (err) {
+    res.status(500).json({ success: false });
   }
 });
 

@@ -1,12 +1,5 @@
 // routes/callback.js
 // POST /callback/mpesa — Safaricom Daraja calls this after payment completes
-//
-// SECURITY NOTE: This endpoint is public (no auth header from Daraja).
-// We validate by:
-//   1. Checking ResultCode
-//   2. Matching CheckoutRequestID to a known pending record
-//   3. Matching the paid amount to a valid package
-//   4. Idempotency via mpesa_code unique index — prevents double-provisioning
 
 "use strict";
 
@@ -20,32 +13,13 @@ const logger = require("../services/logger");
 
 /**
  * POST /callback/mpesa
- * Daraja payload structure (simplified):
- * {
- *   Body: {
- *     stkCallback: {
- *       MerchantRequestID: "...",
- *       CheckoutRequestID: "ws_CO_...",
- *       ResultCode: 0,          // 0 = success
- *       ResultDesc: "...",
- *       CallbackMetadata: {
- *         Item: [
- *           { Name: "Amount",              Value: 10 },
- *           { Name: "MpesaReceiptNumber",  Value: "QJK....." },
- *           { Name: "PhoneNumber",         Value: 254712345678 }
- *         ]
- *       }
- *     }
- *   }
- * }
  */
 router.post("/mpesa", async (req, res) => {
   logger.info("📢 [M-PESA] CALLBACK RECEIVED! Checking payload...");
 
-  // Always respond 200 immediately — Daraja retries if it gets non-2xx
+  // Always respond 200 immediately to Safaricom
   res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
 
-  // ── Parse callback body ─────────────────────────────────────────────────
   const callback = req.body?.Body?.stkCallback;
   if (!callback) {
     logger.warn("Callback received with unexpected structure");
@@ -54,10 +28,10 @@ router.post("/mpesa", async (req, res) => {
 
   const { CheckoutRequestID, ResultCode, ResultDesc } = callback;
   logger.info(
-    `Callback CRQ:${CheckoutRequestID} ResultCode:${ResultCode} → ${ResultDesc}`,
+    `Callback ID:${CheckoutRequestID} Result:${ResultCode} -> ${ResultDesc}`,
   );
 
-  // ── Verify the CheckoutRequestID is one we issued ───────────────────────
+  // ── 1. Find the Pending Payment ──
   const [paymentRows] = await db.execute(
     `SELECT id, phone, amount, package_key, status
      FROM payments
@@ -67,31 +41,29 @@ router.post("/mpesa", async (req, res) => {
   );
 
   if (paymentRows.length === 0) {
-    logger.warn(`Unknown CheckoutRequestID: ${CheckoutRequestID}`);
+    logger.warn(`Rejected: Unknown CheckoutRequestID: ${CheckoutRequestID}`);
     return;
   }
 
   const payment = paymentRows[0];
 
-  // Idempotency: skip if already processed
+  // Idempotency check
   if (payment.status !== "pending") {
-    logger.info(
-      `Duplicate callback for CRQ:${CheckoutRequestID} — already ${payment.status}`,
-    );
+    logger.info(`Ignored: Payment ${payment.id} is already ${payment.status}`);
     return;
   }
 
-  // ── Handle failed payment ────────────────────────────────────────────────
+  // ── 2. Handle Failed Payment ──
   if (ResultCode !== 0) {
     await db.execute(
       `UPDATE payments SET status = 'failed', result_desc = ? WHERE id = ?`,
       [ResultDesc, payment.id],
     );
-    logger.warn(`Payment failed for ${payment.phone}: ${ResultDesc}`);
+    logger.warn(`Failure: Payment failed for ${payment.phone}: ${ResultDesc}`);
     return;
   }
 
-  // ── Extract metadata from successful payment ─────────────────────────────
+  // ── 3. Extract Metadata (Successful Case) ──
   const items = callback.CallbackMetadata?.Item || [];
   const meta = {};
   for (const item of items) {
@@ -100,74 +72,67 @@ router.post("/mpesa", async (req, res) => {
 
   const paidAmount = meta["Amount"];
   const mpesaCode = meta["MpesaReceiptNumber"];
-  const phoneFromMpesa = String(meta["PhoneNumber"]); // 254XXXXXXXXX
 
-  if (!paidAmount || !mpesaCode) {
-    logger.error(
-      `Callback metadata missing for CRQ:${CheckoutRequestID}`,
-      meta,
-    );
-    return;
-  }
-
-  // ── Validate amount matches a package ────────────────────────────────────
+  // ── 4. Verify Package ──
   const pkg = getPackageByAmount(paidAmount);
   if (!pkg) {
     logger.error(
-      `No package matches paid amount KES ${paidAmount} for ${payment.phone}`,
+      `Error: No package for amount KES ${paidAmount} [Phone: ${payment.phone}]`,
     );
     await db.execute(
       `UPDATE payments SET status = 'failed', result_desc = ? WHERE id = ?`,
-      [`Amount mismatch: KES ${paidAmount}`, payment.id],
+      [`Amount mismatch: ${paidAmount}`, payment.id],
     );
     return;
   }
 
-  // ── Duplicate transaction guard (unique mpesa_code) ───────────────────────
+  // Double check code uniqueness
   const [dupCheck] = await db.execute(
-    `SELECT id FROM payments WHERE mpesa_code = ? LIMIT 1`,
+    `SELECT id FROM payments WHERE mpesa_code = ?`,
     [mpesaCode],
   );
   if (dupCheck.length > 0) {
-    logger.warn(`Duplicate M-Pesa code ${mpesaCode} — skipping`);
+    logger.warn(`Alert: Duplicate Mpesa code ${mpesaCode} skipped.`);
     return;
   }
 
-  // ── Provision MikroTik user ───────────────────────────────────────────────
+  // ── 5. Provision the Device! ──
   try {
+    logger.info(
+      `Provisioning ${payment.phone} on router for ${pkg.durationSec}s...`,
+    );
     const result = await provisionUser(
       payment.phone,
       pkg.profile,
       pkg.durationSec,
     );
 
-    // ── Mark payment successful ONLY AFTER PROVISIONING SUCCEEDED ───────────────
+    // Update payment as COMPLETED
     await db.execute(
       `UPDATE payments
        SET status      = 'completed',
            mpesa_code  = ?,
-           result_desc = ?,
+           result_desc = 'SUCCESS',
            amount      = ?
        WHERE id = ?`,
-      [mpesaCode, ResultDesc, paidAmount, payment.id],
+      [mpesaCode, paidAmount, payment.id],
     );
 
-    // Log session start
-    await db.execute(
-      `INSERT INTO sessions (user_id, login_time, package_key, mikrotik_profile)
-       VALUES (?, NOW(), ?, ?)`,
-      [userId, payment.package_key || pkg.profile, pkg.profile],
-    );
+    // Record session
+    await db
+      .execute(
+        `INSERT INTO sessions (phone, status, package_key) VALUES (?, 'active', ?)`,
+        [payment.phone, payment.package_key || pkg.profile],
+      )
+      .catch((e) => logger.warn(`Session log delay: ${e.message}`));
 
     logger.info(
-      `✅ User provisioned on MikroTik: ${payment.phone} [${result.action}] → ${pkg.profile}`,
+      `✅ SUCCESS: ${payment.phone} is now online via ${pkg.profile}`,
     );
   } catch (err) {
-    // Payment succeeded but MikroTik provisioning failed.
-    // Log it — admin can manually provision or retry via /admin/provision endpoint.
-    logger.error(
-      `MikroTik provisioning failed for ${payment.phone}: ${err.message}`,
-    );
+    logger.error(`❌ PROVISION FAILURE for ${payment.phone}: ${err.message}`);
+
+    // Store failure for manual retry
     await db.execute(
       `INSERT INTO provisioning_failures (payment_id, phone, profile, error, created_at)
        VALUES (?, ?, ?, ?, NOW())`,

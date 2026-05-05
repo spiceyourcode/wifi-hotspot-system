@@ -2,385 +2,258 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>WiFi Access — Pay with M-Pesa</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connect to High-Speed WiFi</title>
   <style>
-    /* ── Reset & base ───────────────────────────────────────────── */
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    :root {
+      --primary: #00ca4e;
+      --secondary: #222;
+      --bg: #111;
+      --card: #1a1a1a;
+      --text: #eee;
     }
 
-    :root {
-      --green: #4CAF50;
-      --mpesa: #00A651;
-      /* M-Pesa brand green */
-      --dark: #1a1a2e;
-      --card: #ffffff;
-      --muted: #6c757d;
-      --danger: #dc3545;
-      --radius: 12px;
-      --shadow: 0 4px 24px rgba(0, 0, 0, .10);
+    * {
+      box-sizing: border-box;
+      font-family: 'Segoe UI', system-ui, sans-serif;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
-      min-height: 100vh;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
       display: flex;
-      align-items: center;
       justify-content: center;
-      padding: 16px;
+      min-height: 100vh;
     }
 
-    /* ── Card ───────────────────────────────────────────────────── */
-    .card {
-      background: var(--card);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
+    .container {
       width: 100%;
-      max-width: 400px;
-      overflow: hidden;
+      max-width: 450px;
+      background: var(--card);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
 
-    .card-header {
-      background: var(--mpesa);
-      color: #fff;
-      padding: 24px 24px 20px;
+    h1 {
+      font-size: 1.8rem;
+      margin: 0 0 10px;
+      color: var(--primary);
       text-align: center;
     }
 
-    .wifi-icon {
-      font-size: 2.8rem;
-      margin-bottom: 6px;
+    p {
+      color: #888;
+      text-align: center;
+      margin-bottom: 25px;
     }
 
-    .card-header h1 {
-      font-size: 1.3rem;
-      font-weight: 700;
-      letter-spacing: -.5px;
-    }
-
-    .card-header p {
-      font-size: .85rem;
-      opacity: .88;
-      margin-top: 4px;
-    }
-
-    /* Trial badge */
-    .trial-badge {
-      display: inline-block;
-      background: rgba(255, 255, 255, .22);
-      border: 1px solid rgba(255, 255, 255, .4);
-      border-radius: 20px;
-      padding: 4px 14px;
-      font-size: .78rem;
-      margin-top: 10px;
-      font-weight: 600;
-    }
-
-    /* ── Body ───────────────────────────────────────────────────── */
-    .card-body {
-      padding: 24px;
+    .input-group {
+      margin-bottom: 20px;
     }
 
     label {
       display: block;
-      font-size: .82rem;
-      font-weight: 600;
-      color: #333;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+      color: #aaa;
     }
 
-    input[type="tel"] {
+    input {
       width: 100%;
-      padding: 12px 14px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
+      padding: 14px;
+      background: #222;
+      border: 1px solid #333;
+      border-radius: 10px;
+      color: white;
       font-size: 1rem;
-      transition: border-color .2s;
+    }
+
+    input:focus {
+      border-color: var(--primary);
       outline: none;
     }
 
-    input[type="tel"]:focus {
-      border-color: var(--mpesa);
-    }
-
-    /* ── Package grid ───────────────────────────────────────────── */
-    .packages {
+    .pkg-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin: 18px 0;
+      gap: 15px;
+      margin-bottom: 25px;
     }
 
     .pkg-card {
-      border: 2px solid #e0e0e0;
-      border-radius: 10px;
-      padding: 12px 10px;
+      background: #222;
+      border: 1px solid #333;
+      padding: 15px;
+      border-radius: 15px;
       cursor: pointer;
+      transition: all 0.2s;
       text-align: center;
-      transition: all .2s;
-      user-select: none;
-      position: relative;
-    }
-
-    .pkg-card:hover {
-      border-color: var(--mpesa);
-      background: #f0fbf4;
     }
 
     .pkg-card.active {
-      border-color: var(--mpesa);
-      background: #e8f5e9;
+      border-color: var(--primary);
+      background: rgba(0, 202, 78, 0.1);
+    }
+
+    .pkg-card h3 {
+      margin: 0;
+      font-size: 1.1rem;
     }
 
     .pkg-card .price {
-      font-size: 1.2rem;
-      font-weight: 800;
-      color: var(--mpesa);
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: var(--primary);
+      margin: 5px 0;
     }
 
-    .pkg-card .duration {
-      font-size: .75rem;
-      font-weight: 700;
-      color: #333;
-      margin: 2px 0;
+    .pkg-card .time {
+      font-size: 0.8rem;
+      color: #777;
     }
 
-    .pkg-card .speed {
-      font-size: .7rem;
-      color: var(--muted);
-    }
-
-    .pkg-card .badge {
-      position: absolute;
-      top: -8px;
-      right: 8px;
-      background: var(--mpesa);
-      color: #fff;
-      font-size: .6rem;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 20px;
-    }
-
-    /* ── Pay button ─────────────────────────────────────────────── */
     .btn-pay {
       width: 100%;
-      padding: 14px;
-      background: var(--mpesa);
-      color: #fff;
+      padding: 16px;
+      background: var(--primary);
       border: none;
-      border-radius: 8px;
-      font-size: 1.05rem;
-      font-weight: 700;
+      border-radius: 12px;
+      color: black;
+      font-weight: bold;
+      font-size: 1rem;
       cursor: pointer;
-      letter-spacing: .3px;
-      transition: background .2s, transform .1s;
-      margin-top: 4px;
-    }
-
-    .btn-pay:hover {
-      background: #007a3d;
+      transition: transform 0.1s;
     }
 
     .btn-pay:active {
-      transform: scale(.98);
+      transform: scale(0.98);
     }
 
     .btn-pay:disabled {
-      background: #9e9e9e;
+      opacity: 0.5;
+      background: #666;
       cursor: not-allowed;
     }
 
-    /* ── Status / messages ──────────────────────────────────────── */
     .msg {
-      margin-top: 14px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      font-size: .88rem;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 20px;
       display: none;
-      line-height: 1.5;
+      font-size: 0.9rem;
+      border-left: 4px solid transparent;
     }
 
-    .msg.info {
-      background: #e3f2fd;
-      color: #0d47a1;
+    .msg.error {
+      background: rgba(255, 59, 48, 0.1);
+      color: #ff3b30;
+      border-left-color: #ff3b30;
       display: block;
     }
 
     .msg.success {
-      background: #e8f5e9;
-      color: #1b5e20;
+      background: rgba(0, 202, 78, 0.1);
+      color: var(--primary);
+      border-left-color: var(--primary);
       display: block;
     }
 
-    .msg.error {
-      background: #ffebee;
-      color: var(--danger);
+    .msg.info {
+      background: rgba(10, 132, 255, 0.1);
+      color: #0a84ff;
+      border-left-color: #0a84ff;
       display: block;
     }
 
-    /* ── Polling dots ───────────────────────────────────────────── */
-    .dots {
-      display: inline-block;
-    }
-
-    .dots::after {
-      content: '';
-      animation: dots 1.4s infinite;
-    }
-
-    @keyframes dots {
-      0% {
-        content: '.';
-      }
-
-      33% {
-        content: '..';
-      }
-
-      66% {
-        content: '...';
-      }
-
-      100% {
-        content: '';
-      }
-    }
-
-    /* ── Footer ─────────────────────────────────────────────────── */
-    .card-footer {
-      padding: 14px 24px 18px;
+    .terms {
+      font-size: 0.75rem;
+      color: #555;
       text-align: center;
-      font-size: .75rem;
-      color: var(--muted);
-      border-top: 1px solid #f0f0f0;
-    }
-
-    .card-footer strong {
-      color: var(--mpesa);
+      margin-top: 20px;
     }
   </style>
 </head>
 
 <body>
+  <div class="container">
+    <h1>WiFi Hotspot</h1>
+    <p>Premium High-Speed Internet Access</p>
 
-  <div class="card">
-    <!-- Header -->
-    <div class="card-header">
-      <div class="wifi-icon">📶</div>
-      <h1>Connect to WiFi</h1>
-      <p>Fast, reliable internet access</p>
-      <div class="trial-badge">✅ 3 min FREE trial — no payment needed</div>
+    <div id="statusMsg" class="msg"></div>
+
+    <div id="resumeSection" style="display:none"></div>
+
+    <div class="input-group">
+      <label>Enter M-Pesa Number</label>
+      <input type="tel" id="placeholder-phone" placeholder="07XXXXXXXX or 01XXXXXXXX" value="0792873281">
     </div>
 
-    <!-- Body -->
-    <div class="card-body">
-
-      <!-- Session Resume -->
-      <div id="resumeSection" style="display:none; margin-bottom: 20px;"></div>
-
-      <!-- Phone input -->
-      <label for="phone">M-Pesa Phone Number</label>
-      <input type="tel" id="phone" placeholder="e.g. 0712 345 678" inputmode="numeric" maxlength="15"
-        autocomplete="tel" />
-
-      <!-- Package selection -->
-      <label style="margin-top:18px">Choose Package</label>
-      <div class="packages" id="packages">
-        <div class="pkg-card active" data-key="1hr">
-          <div class="price">KES 10</div>
-          <div class="duration">1 Hour</div>
-          <div class="speed">2 Mbps</div>
-        </div>
-        <div class="pkg-card" data-key="6hr">
-          <div class="price">KES 30</div>
-          <div class="duration">6 Hours</div>
-          <div class="speed">2 Mbps</div>
-        </div>
-        <div class="pkg-card" data-key="24hr">
-          <div class="price">KES 50</div>
-          <div class="duration">24 Hours</div>
-          <div class="speed">3 Mbps</div>
-          <div class="badge">Popular</div>
-        </div>
-        <div class="pkg-card" data-key="7day">
-          <div class="price">KES 200</div>
-          <div class="duration">7 Days</div>
-          <div class="speed">4 Mbps</div>
-          <div class="badge">Best Value</div>
-        </div>
+    <label>Select a Package</label>
+    <div class="pkg-grid">
+      <div class="pkg-card active" data-key="1hr">
+        <h3>Power Hour</h3>
+        <div class="price">KES 10</div>
+        <div class="time">1 Hour Access</div>
       </div>
+      <div class="pkg-card" data-key="3hr">
+        <h3>Standard</h3>
+        <div class="price">KES 20</div>
+        <div class="time">3 Hours Access</div>
+      </div>
+      <div class="pkg-card" data-key="24hr">
+        <h3>Daily</h3>
+        <div class="price">KES 50</div>
+        <div class="time">Full 24 Hours</div>
+      </div>
+      <div class="pkg-card" data-key="week">
+        <h3>Weekly</h3>
+        <div class="price">KES 250</div>
+        <div class="time">7 Day Pass</div>
+      </div>
+    </div>
 
-      <!-- Pay button -->
-      <button class="btn-pay" id="payBtn" onclick="handlePay()">
-        Pay with M-Pesa
-      </button>
+    <button id="payBtn" class="btn-pay" onclick="handlePay()">PAY VIA M-PESA</button>
 
-      <!-- Free Trial button -->
-      <button class="btn-pay" id="trialBtn" onclick="handleTrial()" style="background:#444; margin-top:10px;">
-        Activate Free Trial (3 min)
-      </button>
+    <div style="text-align:center; margin-top:15px;">
+      <a href="#" style="color:#777; text-decoration:none; font-size:0.85rem;"
+        onclick="handleTrial(); return false;">New? Try 3 mins for Free</a>
+    </div>
 
-      <!-- Status messages -->
-      <div class="msg" id="statusMsg"></div>
-
+    <div class="terms">
+      By connecting, you agree to our Terms of Service.<br>
+      Automated via Lipa Na M-Pesa.
     </div>
 
     <!-- Hidden MikroTik Login Form -->
-    <form id="mikrotikForm" action="http://192.168.88.1/login" method="post" style="display:none">
-      <input type="hidden" name="username" id="hs_user">
-      <input type="hidden" name="password" id="hs_pass">
-      <input type="hidden" name="dst" value="http://192.168.88.1/">
+    <form name="sendin" action="$(link-login-only)" method="post" style="display:none">
+      <input type="hidden" name="username" />
+      <input type="hidden" name="password" />
+      <input type="hidden" name="dst" value="$(link-orig)" />
+      <input type="hidden" name="popup" value="true" />
     </form>
-
-    <!-- Footer -->
-    <div class="card-footer">
-      Powered by <strong>M-Pesa</strong> &nbsp;|&nbsp; Secure &amp; Instant
-    </div>
   </div>
 
   <script>
     // ── Configuration ────────────────────────────────────────────────────────
-    // For VPS: Replace this with your Google Cloud Public IP or Domain
-    const API_BASE   = "http://136.113.152.126:3000"; 
-    
-    // Captured directly from MikroTik template variables
-    const CLIENT_IP  = "$(ip)";
+    const API_BASE = "http://136.113.152.126:3000";
+    const CLIENT_IP = "$(ip)";
     const CLIENT_MAC = "$(mac)";
 
-    /**
-     * Automatically log into MikroTik after provisioning
-     */
-    function loginToMikrotik(username) {
-      if (!username) return;
-      // Save for next time
-      localStorage.setItem('hotspot_phone', username);
-
-      document.getElementById('hs_user').value = username;
-      document.getElementById('hs_pass').value = username;
-      document.getElementById('mikrotikForm').submit();
-    }
-
-    // ── State ────────────────────────────────────────────────────────────────
-    let selectedPackage = '1hr';
+    let selectedPackage = "1hr";
     let pollInterval = null;
 
-    // ── Initial Load ─────────────────────────────────────────────────────────
     window.onload = () => {
-      const savedPhone = localStorage.getItem('hotspot_phone');
+      // Restore phone from storage
+      const savedPhone = localStorage.getItem('last_phone');
       if (savedPhone) {
-        document.getElementById('phone').value = savedPhone;
+        document.getElementById('placeholder-phone').value = savedPhone;
         checkSessionStatus(savedPhone);
       }
 
-      // Package click listeners
       document.querySelectorAll('.pkg-card').forEach(card => {
         card.addEventListener('click', () => {
           document.querySelectorAll('.pkg-card').forEach(c => c.classList.remove('active'));
@@ -391,13 +264,11 @@
     };
 
     /**
-     * Check if this phone has an active paid session
+     * Check if this phone has an active session
      */
     async function checkSessionStatus(phone) {
       try {
-        const res = await fetch(`${API_BASE}/admin/status/${phone}`, {
-          headers: { 'Authorization': 'Bearer hotspot-admin-secret-2024' }
-        });
+        const res = await fetch(`${API_BASE}/pay/status/${phone}`);
         const data = await res.json();
         if (data.active) {
           showResumeSection(phone);
@@ -409,15 +280,14 @@
       const section = document.getElementById('resumeSection');
       section.innerHTML = `
         <div class="msg info" style="margin-bottom:15px; display:block">
-          Welcome back! You have an active session for <strong>${phone}</strong>
+          Welcome back! Active session found for <strong>${phone}</strong>
         </div>
         <button class="btn-pay" style="background:#555; margin-bottom:10px;" onclick="loginToMikrotik('${phone}')">Continue Browsing</button>
-        <div style="text-align:center; font-size:0.8rem; color:#777; margin-bottom:15px;">— or use a different number below —</div>
+        <div style="text-align:center; font-size:0.8rem; color:#777; margin-bottom:15px;">— or pay again below —</div>
       `;
       section.style.display = 'block';
     }
 
-    // ── Show status message ──────────────────────────────────────────────────
     function showMsg(type, html) {
       const el = document.getElementById('statusMsg');
       el.className = `msg ${type}`;
@@ -428,139 +298,114 @@
       const el = document.getElementById('statusMsg');
       el.className = 'msg';
       el.innerHTML = '';
+      el.style.display = 'none';
     }
 
-    // ── Free Trial ───────────────────────────────────────────────────────────
+    /**
+     * Activate 3 min trial
+     */
     async function handleTrial() {
-      const phone = document.getElementById('phone').value.trim();
+      const phone = document.getElementById('placeholder-phone').value.trim();
       if (!phone) {
-        showMsg('error', '⚠️ Please enter your phone number first to activate the trial.');
+        showMsg('error', 'Enter your phone number first.');
         return;
       }
 
-      const btn = document.getElementById('trialBtn');
-      const oldText = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = 'Activating...';
+      showMsg('info', 'Activating your free trial...');
 
       try {
         const res = await fetch(`${API_BASE}/pay/trial`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            phone,
-            ip: CLIENT_IP,
-            mac: CLIENT_MAC
-          }),
+          body: JSON.stringify({ phone, ip: CLIENT_IP, mac: CLIENT_MAC }),
         });
         const data = await res.json();
 
         if (data.success) {
-          showMsg('success', `✅ ${data.message} Logging you in...`);
-          // Fixed: Use normalized username from server
+          showMsg('success', '✅ Trial active! Logging you in...');
           setTimeout(() => { loginToMikrotik(data.username); }, 2000);
         } else {
           showMsg('error', `❌ ${data.message}`);
-          btn.disabled = false;
-          btn.textContent = oldText;
         }
       } catch (err) {
-        showMsg('error', '❌ Could not reach the server. Make sure you are connected to the WiFi.');
-        btn.disabled = false;
-        btn.textContent = oldText;
+        showMsg('error', '❌ Could not reach server. Reconnect to WiFi.');
       }
     }
 
-    // ── Initiate payment ─────────────────────────────────────────────────────
+    /**
+     * Initiate M-Pesa STK Push
+     */
     async function handlePay() {
       hideMsg();
-      const phone = document.getElementById('phone').value.trim();
+      const phone = document.getElementById('placeholder-phone').value.trim();
       const btn = document.getElementById('payBtn');
 
-      if (!phone) {
-        showMsg('error', '⚠️ Please enter your M-Pesa phone number.');
+      if (!phone || phone.length < 10) {
+        showMsg('error', 'Please enter a valid M-Pesa number.');
         return;
       }
 
+      localStorage.setItem('last_phone', phone);
       btn.disabled = true;
-      btn.textContent = 'Sending prompt…';
+      const oldText = btn.textContent;
+      btn.textContent = 'Wait for STK Push...';
 
       try {
         const res = await fetch(`${API_BASE}/pay`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            phone, 
-            package: selectedPackage,
-            ip: CLIENT_IP,
-            mac: CLIENT_MAC
-          }),
+          body: JSON.stringify({ phone, package: selectedPackage, mac: CLIENT_MAC }),
         });
         const data = await res.json();
 
-        if (!data.success) {
+        if (data.success) {
+          showMsg('info', 'Check your phone and enter M-Pesa PIN.');
+          startPolling(phone, btn, oldText);
+        } else {
           showMsg('error', `❌ ${data.message}`);
-          btn.disabled = false;
-          btn.textContent = 'Pay with M-Pesa';
-          return;
+          resetBtn();
         }
-
-        // Success — show waiting UI and start polling
-        showMsg('info',
-          `📱 <strong>M-Pesa prompt sent to ${phone}</strong><br>
-        Enter your PIN on your phone<span class="dots"></span><br>
-        <small>KES ${data.amount} for ${data.package}</small>`
-        );
-        btn.textContent = 'Waiting for payment…';
-        startPolling(data.checkoutRequestId, phone);
-
       } catch (err) {
-        showMsg('error', '❌ Network error. Please check your connection and try again.');
-        btn.disabled = false;
-        btn.textContent = 'Pay with M-Pesa';
+        showMsg('error', '❌ Connection error. Try again.');
+        resetBtn();
       }
     }
 
-    // ── Poll payment status ──────────────────────────────────────────────────
-    function startPolling(checkoutRequestId, phone) {
+    function startPolling(phone, btn, oldText) {
       let attempts = 0;
-      const MAX_ATTEMPTS = 30;
-
       pollInterval = setInterval(async () => {
         attempts++;
-        if (attempts > MAX_ATTEMPTS) {
+        if (attempts > 30) {
           clearInterval(pollInterval);
-          showMsg('error', '⏳ Timeout. Check your connection or try again.');
+          showMsg('error', '⏳ Timeout waiting for payment. If you paid, refresh in a minute.');
           resetBtn();
           return;
         }
 
         try {
-          const res = await fetch(`${API_BASE}/pay/status/${checkoutRequestId}`);
+          const res = await fetch(`${API_BASE}/pay/status/${phone}`);
           const data = await res.json();
-
-          if (data.status === 'completed') {
+          if (data.active) {
             clearInterval(pollInterval);
-            showMsg('success', '✅ <strong>Payment confirmed!</strong> Logging you in...');
-            // Fixed: Use normalized username from server
-            setTimeout(() => { loginToMikrotik(data.username); }, 2000);
-
-          } else if (data.status === 'failed') {
-            clearInterval(pollInterval);
-            showMsg('error', '❌ Payment failed. Please try again.');
-            resetBtn();
+            showMsg('success', '✅ Payment confirmed! Taking you online...');
+            setTimeout(() => { loginToMikrotik(data.username); }, 1500);
           }
-        } catch (_) { }
+        } catch (e) { }
       }, 3000);
     }
 
     function resetBtn() {
       const btn = document.getElementById('payBtn');
       btn.disabled = false;
-      btn.textContent = 'Pay with M-Pesa';
+      btn.textContent = 'PAY VIA M-PESA';
+    }
+
+    function loginToMikrotik(username) {
+      document.sendin.username.value = username;
+      document.sendin.password.value = username;
+      document.sendin.submit();
     }
   </script>
-
 </body>
 
 </html>
