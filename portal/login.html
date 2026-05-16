@@ -238,7 +238,6 @@
   </div>
 
   <script>
-    // ── Configuration ────────────────────────────────────────────────────────
     const API_BASE = "http://136.113.152.126:3000";
     const CLIENT_IP = "$(ip)";
     const CLIENT_MAC = "$(mac)";
@@ -247,7 +246,6 @@
     let pollInterval = null;
 
     window.onload = () => {
-      // Restore phone from storage
       const savedPhone = localStorage.getItem('last_phone');
       if (savedPhone) {
         document.getElementById('placeholder-phone').value = savedPhone;
@@ -263,16 +261,11 @@
       });
     };
 
-    /**
-     * Check if this phone has an active session
-     */
     async function checkSessionStatus(phone) {
       try {
         const res = await fetch(`${API_BASE}/pay/status/${phone}`);
         const data = await res.json();
-        if (data.active) {
-          showResumeSection(phone);
-        }
+        if (data.active) showResumeSection(phone);
       } catch (e) { }
     }
 
@@ -301,9 +294,6 @@
       el.style.display = 'none';
     }
 
-    /**
-     * Activate 3 min trial
-     */
     async function handleTrial() {
       const phone = document.getElementById('placeholder-phone').value.trim();
       if (!phone) {
@@ -332,9 +322,6 @@
       }
     }
 
-    /**
-     * Initiate M-Pesa STK Push
-     */
     async function handlePay() {
       hideMsg();
       const phone = document.getElementById('placeholder-phone').value.trim();
@@ -377,7 +364,7 @@
         attempts++;
         if (attempts > 30) {
           clearInterval(pollInterval);
-          showMsg('error', '⏳ Timeout waiting for payment. If you paid, refresh in a minute.');
+          showMsg('error', '⏳ Timeout waiting for payment.');
           resetBtn();
           return;
         }
