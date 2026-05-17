@@ -115,4 +115,15 @@ async function initiateSTKPush(rawPhone, amount, reference = "WiFi") {
   return data;
 }
 
-module.exports = { initiateSTKPush, normalisePhone };
+/**
+ * Generate a unique transaction ID for M-Pesa payments.
+ * Format: WIFI + timestamp + random alphanumeric (e.g., WIFI202605171234ABC123)
+ * @returns {string}
+ */
+function generateTransactionId() {
+  const ts = new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 14);
+  const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `WIFI${ts}${rand}`;
+}
+
+module.exports = { initiateSTKPush, normalisePhone, generateTransactionId };
