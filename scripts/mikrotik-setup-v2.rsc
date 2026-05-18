@@ -32,7 +32,7 @@
 
 # --- 6. HOTSPOT CORE ---
 /ip hotspot profile add name=hsprof1
-/ip hotspot profile set [find name=hsprof1] dns-name=wifi.hotspot html-directory=hotspot login-by=http-pap,cookie
+/ip hotspot profile set [find name=hsprof1] dns-name=wifi.hotspot html-directory=hotspot login-by=http-pap,http-chap,cookie,https
 /ip hotspot add name=hotspot1 interface=bridge address-pool=hs-pool profile=hsprof1 disabled=no
 
 # --- 7. USER PROFILES ---
@@ -40,6 +40,12 @@
 /ip hotspot user profile set trial rate-limit=1M/1M shared-users=1 status-autorefresh=1m
 /ip hotspot user profile add name="1hr"
 /ip hotspot user profile set "1hr" rate-limit=2M/2M shared-users=1 status-autorefresh=1m
+/ip hotspot user profile add name="6hr"
+/ip hotspot user profile set "6hr" rate-limit=2M/2M shared-users=1 status-autorefresh=1m
+/ip hotspot user profile add name="24hr"
+/ip hotspot user profile set "24hr" rate-limit=3M/3M shared-users=1 status-autorefresh=1m
+/ip hotspot user profile add name="7day"
+/ip hotspot user profile set "7day" rate-limit=4M/4M shared-users=1 status-autorefresh=1m
 
 # --- 8. API & BYPASS ---
 /ip service set www port=8080

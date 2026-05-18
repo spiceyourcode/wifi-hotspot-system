@@ -199,19 +199,19 @@
         <div class="price">KES 10</div>
         <div class="time">1 Hour Access</div>
       </div>
-      <div class="pkg-card" data-key="3hr">
-        <h3>Standard</h3>
-        <div class="price">KES 20</div>
-        <div class="time">3 Hours Access</div>
+      <div class="pkg-card" data-key="6hr">
+        <h3>Half Day</h3>
+        <div class="price">KES 30</div>
+        <div class="time">6 Hours Access</div>
       </div>
       <div class="pkg-card" data-key="24hr">
         <h3>Daily</h3>
         <div class="price">KES 50</div>
         <div class="time">Full 24 Hours</div>
       </div>
-      <div class="pkg-card" data-key="week">
+      <div class="pkg-card" data-key="7day">
         <h3>Weekly</h3>
-        <div class="price">KES 250</div>
+        <div class="price">KES 200</div>
         <div class="time">7 Day Pass</div>
       </div>
     </div>
@@ -238,7 +238,7 @@
   </div>
 
   <script>
-    const API_BASE = "http://136.113.152.126:3000";
+    const API_BASE = "https://unhoodwinked-preluxurious-korey.ngrok-free.dev/";
     const CLIENT_IP = "$(ip)";
     const CLIENT_MAC = "$(mac)";
 
@@ -275,7 +275,7 @@
         <div class="msg info" style="margin-bottom:15px; display:block">
           Welcome back! Active session found for <strong>${phone}</strong>
         </div>
-        <button class="btn-pay" style="background:#555; margin-bottom:10px;" onclick="loginToMikrotik('${phone}')">Continue Browsing</button>
+        <button class="btn-pay" style="background:#555; margin-bottom:10px;" onclick="document.sendin.username.value='${phone}'; document.sendin.password.value='${phone}'; document.sendin.submit();">Use Existing Session</button>
         <div style="text-align:center; font-size:0.8rem; color:#777; margin-bottom:15px;">— or pay again below —</div>
       `;
       section.style.display = 'block';
@@ -375,7 +375,11 @@
           if (data.active) {
             clearInterval(pollInterval);
             showMsg('success', '✅ Payment confirmed! Taking you online...');
-            setTimeout(() => { loginToMikrotik(data.username); }, 1500);
+            setTimeout(() => {
+              document.sendin.username.value = data.username;
+              document.sendin.password.value = data.username;
+              document.sendin.submit();
+            }, 1000);
           }
         } catch (e) { }
       }, 3000);
