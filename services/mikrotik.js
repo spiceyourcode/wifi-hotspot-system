@@ -52,46 +52,57 @@ async function closeClient(client) {
  * @returns {Promise<{action: 'created'|'updated', username: string}>}
  */
 async function provisionUser(phone, profile, durationSec) {
-  const username = phone; // phone number as username for easy lookup
-  const password = phone; // same — user doesn't type it; portal auto-logs in
+  const username = phone;
+  const password = phone;
+  console.log(`[MikroTik] Provisioning ${username} with profile ${profile}...`);
   const client = await getClient();
+  console.log(`[MikroTik] Client connected to ${ROUTER_CONFIG.host}`);
 
   try {
-    // ── Pre-Cleanup (Ensure a fresh start for the new package) ──────────────
-    // Remove if exists (to reset cumulative uptime)
+    console.log(`[MikroTik] Checking for existing user ${username}...`);
     const existing = await client.write("/ip/hotspot/user/print", [
       `?name=${username}`,
     ]);
+    console.log(`[MikroTik] Found ${existing.length} existing users.`);
     for (const u of existing) {
+      console.log(`[MikroTik] Removing existing user ID: ${u[".id"]}`);
       await client.write("/ip/hotspot/user/remove", [`=.id=${u[".id"]}`]);
     }
 
-    // Kick active sessions
+    console.log(`[MikroTik] Checking for active sessions...`);
     const active = await client.write("/ip/hotspot/active/print", [
       `?user=${username}`,
     ]);
     for (const s of active) {
+      console.log(`[MikroTik] Removing active session ID: ${s[".id"]}`);
       await client.write("/ip/hotspot/active/remove", [`=.id=${s[".id"]}`]);
     }
 
-    // Clear host entry (to avoid mac-binding issues)
+    console.log(`[MikroTik] Checking for host entries...`);
     const hosts = await client.write("/ip/hotspot/host/print", [
       `?user=${username}`,
     ]);
     for (const h of hosts) {
+      console.log(`[MikroTik] Removing host entry ID: ${h[".id"]}`);
       await client.write("/ip/hotspot/host/remove", [`=.id=${h[".id"]}`]);
     }
 
-    // ── Create Clean User ───────────────────────────────────────────────────
+    const uptime = formatUptime(durationSec);
+    console.log(
+      `[MikroTik] Adding fresh user ${username} (profile: ${profile}, uptime: ${uptime})...`,
+    );
     await client.write("/ip/hotspot/user/add", [
       `=name=${username}`,
       `=password=${password}`,
       `=profile=${profile}`,
-      `=limit-uptime=${formatUptime(durationSec)}`,
+      `=limit-uptime=${uptime}`,
     ]);
 
     logger.info(`MikroTik user provisioned [FRESH]: ${username} → ${profile}`);
     return { action: "created", username };
+  } catch (err) {
+    console.error(`[MikroTik] Error during provisioning:`, err);
+    throw err;
   } finally {
     await closeClient(client);
   }

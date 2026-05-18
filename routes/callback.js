@@ -70,26 +70,43 @@ router.post("/mpesa", async (req, res) => {
   if (dupCheck.length > 0) return;
 
   try {
+    // 1. Ensure user exists in 'users' table
+    const [userResult] = await db.execute(
+      "INSERT INTO users (phone, profile) VALUES (?, ?) ON DUPLICATE KEY UPDATE profile = VALUES(profile)",
+      [payment.phone, pkg.profile],
+    );
+
+    // 2. Provision on MikroTik
     await provisionUser(payment.phone, pkg.profile, pkg.durationSec);
 
+    // 3. Complete payment record
     await db.execute(
       `UPDATE payments SET status = 'completed', mpesa_code = ?, result_desc = 'SUCCESS', amount = ? WHERE id = ?`,
       [mpesaCode, paidAmount, payment.id],
     );
 
-    await db
-      .execute(
-        `INSERT INTO sessions (phone, status, package_key) VALUES (?, 'active', ?)`,
-        [payment.phone, payment.package_key || pkg.profile],
-      )
-      .catch((e) => {});
+    // 4. Record session
+    const [userData] = await db.execute(
+      "SELECT id FROM users WHERE phone = ?",
+      [payment.phone],
+    );
+    if (userData.length > 0) {
+      await db
+        .execute(
+          `INSERT INTO sessions (user_id, package_key, mikrotik_profile) VALUES (?, ?, ?)`,
+          [userData[0].id, payment.package_key || pkg.profile, pkg.profile],
+        )
+        .catch((e) => logger.warn(`Session record failed: ${e.message}`));
+    }
 
     logger.info(`✅ Access Granted: ${payment.phone}`);
   } catch (err) {
-    logger.error(`❌ Provisioning failure: ${err.message}`);
+    logger.error(`❌ Provisioning failure: ${err.message || err}`, {
+      stack: err.stack,
+    });
     await db.execute(
       `INSERT INTO provisioning_failures (payment_id, phone, profile, error) VALUES (?, ?, ?, ?)`,
-      [payment.id, payment.phone, pkg.profile, err.message],
+      [payment.id, payment.phone, pkg.profile, err.message || "Unknown error"],
     );
   }
 });
