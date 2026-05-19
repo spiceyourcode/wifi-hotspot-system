@@ -32,8 +32,9 @@
 
 # --- 6. HOTSPOT CORE ---
 /ip hotspot profile add name=hsprof1
-/ip hotspot profile set [find name=hsprof1] dns-name=wifi.hotspot html-directory=hotspot login-by=http-pap,http-chap,cookie,https
+/ip hotspot profile set [find name=hsprof1] dns-name=wifi.hotspot html-directory=hotspot login-by=http-pap,http-chap,cookie,https refresh-timeout=1m
 /ip hotspot add name=hotspot1 interface=bridge address-pool=hs-pool profile=hsprof1 disabled=no
+/ip hotspot profile set hsprof1 html-directory=hotspot dns-name=wifi.hotspot
 
 # --- 7. USER PROFILES ---
 /ip hotspot user profile add name=trial
@@ -58,9 +59,7 @@
 /ip hotspot walled-garden ip remove [find dst-address=192.168.88.254]
 /ip hotspot walled-garden ip add dst-address=192.168.88.254 action=accept
 
-# Cloud Whitelist (136.113.152.126)
-/ip hotspot ip-binding remove [find address=136.113.152.126]
-/ip hotspot ip-binding add address=136.113.152.126 type=bypassed comment="GCP-Server"
+# Cloud Whitelist (GCP)
 /ip hotspot walled-garden ip remove [find dst-address=136.113.152.126]
 /ip hotspot walled-garden ip add dst-address=136.113.152.126 action=accept
 

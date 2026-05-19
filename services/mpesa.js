@@ -35,7 +35,7 @@ async function getAccessToken() {
     `${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
     {
       headers: { Authorization: `Basic ${credentials}` },
-      timeout: 10_000,
+      timeout: 30_000,
     },
   );
 
@@ -121,7 +121,10 @@ async function initiateSTKPush(rawPhone, amount, reference = "WiFi") {
  * @returns {string}
  */
 function generateTransactionId() {
-  const ts = new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 14);
+  const ts = new Date()
+    .toISOString()
+    .replace(/[-:T.]/g, "")
+    .slice(0, 14);
   const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
   return `WIFI${ts}${rand}`;
 }

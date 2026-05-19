@@ -60,9 +60,9 @@ router.post("/", async (req, res) => {
     if (reqMac) {
       await db
         .execute(
-          `INSERT INTO users (phone, mac_address) VALUES (?, ?) 
-         ON DUPLICATE KEY UPDATE mac_address = VALUES(mac_address)`,
-          [normPhone, reqMac],
+          `INSERT INTO users (phone, mac_address, profile) VALUES (?, ?, ?) 
+         ON DUPLICATE KEY UPDATE mac_address = VALUES(mac_address), profile = VALUES(profile)`,
+          [normPhone, reqMac, pkg.profile],
         )
         .catch((e) =>
           logger.warn(`Could not sync MAC on payment: ${e.message}`),
@@ -144,7 +144,7 @@ router.post("/trial", async (req, res) => {
       `SELECT id FROM payments WHERE phone = ? AND package_key = 'trial' AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR) LIMIT 1`,
       [normPhone],
     );
-    if (existingPhone.length > 0) {
+    if (existingPhone.length > 0 && process.env.NODE_ENV === "production") {
       return res.status(403).json({ success: false, message: "Used today." });
     }
 
@@ -152,7 +152,7 @@ router.post("/trial", async (req, res) => {
       `SELECT phone FROM users WHERE mac_address = ? AND trial_used = 1 LIMIT 1`,
       [mac],
     );
-    if (existingMac.length > 0) {
+    if (existingMac.length > 0 && process.env.NODE_ENV === "production") {
       return res.status(403).json({ success: false, message: "Device used." });
     }
 
