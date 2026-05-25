@@ -1,6 +1,3 @@
-// routes/callback.js
-// POST /callback/mpesa — Safaricom Daraja calls this after payment completes
-
 "use strict";
 
 const express = require("express");
