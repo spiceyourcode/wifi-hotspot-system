@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   # --- The Hotspot API Server ---
   app:
@@ -19,7 +17,7 @@ services:
       db:
         condition: service_healthy
 
-  # --- The Database Server ---
+ 
   db:
     image: mysql:8.0
     container_name: hotspot-db
