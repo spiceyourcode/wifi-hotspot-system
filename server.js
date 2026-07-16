@@ -1,5 +1,3 @@
-// server.js
-// WiFi Hotspot Monetization System
 "use strict";
 
 require("dotenv").config();
